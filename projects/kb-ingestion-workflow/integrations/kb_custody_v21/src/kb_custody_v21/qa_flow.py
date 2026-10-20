@@ -109,7 +109,7 @@ class QAFlow:
                     continue
             else:
                 output = self.model.saved(job)
-                text = render_answer(output, result['hits']) if output is not None else result['text']
+                text = render_answer(output, result['hits'], job['plan']['query'].get('selected', []) if job['plan']['query']['mode']=='compare' else ()) if output is not None else result['text']
             if saved is None:
                 self.daily.put('qa-delivery-text:'+job['id'], text)
             else:

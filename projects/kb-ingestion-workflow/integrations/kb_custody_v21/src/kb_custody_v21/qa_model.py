@@ -107,8 +107,24 @@ def render_answer(output, hits, selected=()):
     lines = ['依据当前检索原文整理（简版）：']
     if output['gaps']:
         lines.append('范围提示：'+output['gaps'][0])
+    shown = []
+    remaining = set(selected)
+    while remaining:
+        choices = [(len(remaining & {by_id[e['evidence_id']]['material_id'] for e in claim['evidence']}), i)
+                   for i, claim in enumerate(output['claims']) if i not in shown]
+        score, i = max(choices, key=lambda pair: (pair[0], -pair[1]), default=(0, 0))
+        if score == 0:
+            break
+        shown.append(i)
+        remaining -= {by_id[e['evidence_id']]['material_id'] for e in output['claims'][i]['evidence']}
+    for i in range(len(output['claims'])):
+        if len(shown) >= 2:
+            break
+        if i not in shown:
+            shown.append(i)
     used = {}
-    for claim in output['claims'][:2]:
+    for i in sorted(shown):
+        claim = output['claims'][i]
         numbers = list(dict.fromkeys(str(materials.index(by_id[e['evidence_id']]['material_id'])+1) for e in claim['evidence']))
         lines.append(claim['text']+' ['+','.join(numbers)+']')
         quote = claim['evidence'][0]['quote']

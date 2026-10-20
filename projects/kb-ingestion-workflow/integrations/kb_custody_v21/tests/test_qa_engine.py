@@ -205,3 +205,14 @@ class QAEngineTests(unittest.TestCase):
         receipt=self.root/'qa-jobs'/job['id']/'response.local.json'
         receipt.write_text('{}')
         with self.assertRaisesRegex(ContractError,'回执变化'):self.model.saved(job)
+
+
+    def test_compact_comparison_retains_each_selected_source(self):
+        self.index.sync(self.provider);hits=self.index.search('城市演变')
+        first=hits[0];other=next(h for h in hits if h['material_id']!=first['material_id'])
+        claims=[dict(text='第一份的主张'+str(i),evidence=[dict(evidence_id=first['evidence_id'],quote=first['text'])]) for i in range(2)]
+        claims.append(dict(text='另一份的独立表述。',evidence=[dict(evidence_id=other['evidence_id'],quote=other['text'])]))
+        text=render_answer(dict(status='grounded',claims=claims,gaps=[]),hits,[first['material_id'],other['material_id']])
+        self.assertIn('第一份的主张0',text)
+        self.assertIn('另一份的独立表述。',text)
+        self.assertNotIn('第一份的主张1',text)

@@ -52,7 +52,7 @@ class QAEngine:
                 status = error.reason
             else:
                 output = comparison_coverage(output, hits, selected if query['mode']=='compare' else ())
-                text, status = render_answer(output, hits), output['status']
+                text, status = render_answer(output, hits, selected if query['mode']=='compare' else ()), output['status']
         self.sources.verify(hits)
         materials = list(dict.fromkeys(h['material_id'] for h in hits))[:8]
         topic = context.get('question', query['question']) if query['mode']=='followup' else query['question']
