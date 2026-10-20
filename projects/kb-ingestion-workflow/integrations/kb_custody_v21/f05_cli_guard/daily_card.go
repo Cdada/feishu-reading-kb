@@ -47,6 +47,16 @@ func cardBinding(v *dailyCard) bool {
 	if relationPurpose(purpose) {
 		return relationBinding(b)
 	}
+	if purpose == "qa" {
+		job, _ := b["job_id"].(string)
+		details, _ := b["details"].(string)
+		return len(b) == 6 && cardSHA.MatchString(job) && len(details) > 0 && len(details) <= 12000
+	}
+	if purpose == "qa" {
+		job, _ := b["job_id"].(string)
+		details, _ := b["details"].(string)
+		return len(b) == 6 && cardSHA.MatchString(job) && len(details) > 0 && len(details) <= 12000
+	}
 	if purpose == "preview" {
 		id, _ := b["publication_id"].(string)
 		digest, _ := b["pdf_sha256"].(string)
@@ -73,6 +83,14 @@ func cardJSON(v *dailyCard) map[string]any {
 	}
 	if relationPurpose(b["purpose"]) {
 		title, detail, commands = relationCard(b)
+	}
+	if b["purpose"] == "qa" {
+		title, detail = "知识库问答", b["details"].(string)
+		commands = []string{"查看原文依据", "本周周报", "新问题"}
+	}
+	if b["purpose"] == "qa" {
+		title, detail = "知识库问答", b["details"].(string)
+		commands = []string{"查看原文依据", "本周周报", "新问题"}
 	}
 	t := plainCardText(v.Title)
 	t["text_size"] = "heading-3"
@@ -104,6 +122,26 @@ func dailyCardPath(c Control, p pilotSession) bool {
 		if !relationEnabled(c, p.Daily.Rules) {
 			return false
 		}
+	} else if v.Binding["purpose"] == "qa" {
+		var rules struct {
+			QA struct {
+				Reference string `json:"reference"`
+				Enabled   bool   `json:"enabled"`
+			} `json:"qa"`
+		}
+		if !frozenJSON(c, p.Daily.Rules, &rules) || rules.QA.Reference != "P43-qa-v1" || !rules.QA.Enabled {
+			return false
+		}
+	} else if v.Binding["purpose"] == "qa" {
+		var rules struct {
+			QA struct {
+				Reference string `json:"reference"`
+				Enabled   bool   `json:"enabled"`
+			} `json:"qa"`
+		}
+		if !frozenJSON(c, p.Daily.Rules, &rules) || rules.QA.Reference != "P43-qa-v1" || !rules.QA.Enabled {
+			return false
+		}
 	} else if len(v.Content) > 7000 {
 		return false
 	}
@@ -115,7 +153,7 @@ func dailyCardPath(c Control, p pilotSession) bool {
 	targetOK := false
 	for _, m := range dailyReceiptMessages(c, p, v.Target) {
 		if m["message_id"] == parent && dailyBotMessage(m, p) &&
-			((v.Binding["purpose"] == "preview" || relationPurpose(v.Binding["purpose"])) && m["msg_type"] == "file" || v.Binding["purpose"] == "images" && m["msg_type"] == "text") {
+			((v.Binding["purpose"] == "preview" || relationPurpose(v.Binding["purpose"])) && m["msg_type"] == "file" || (v.Binding["purpose"] == "images" || v.Binding["purpose"] == "qa") && m["msg_type"] == "text") {
 			targetOK = true
 		}
 	}

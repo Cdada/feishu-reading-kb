@@ -57,10 +57,14 @@ class CardFlow:
         event = bounded_json(raw)
         value = bounded_json(event.get('action_value'), 4096)
         card = self.cards.get(value.get('card_id'))
-        document = self.store.document(card['document_id'])
-        if card['purpose'].startswith('relation_'):
+        if card['purpose'] == 'qa':
+            if self.backend.qa is None:
+                raise ContractError('QA profile disabled')
+            binding, target = self.backend.qa.current(card)
+        elif card['purpose'].startswith('relation_'):
             binding, target = self.backend.relations.current(card)
         else:
+            document = self.store.document(card['document_id'])
             binding, target = self.material(document, card['purpose'])
         def access():
             self.backend.check_authorization()

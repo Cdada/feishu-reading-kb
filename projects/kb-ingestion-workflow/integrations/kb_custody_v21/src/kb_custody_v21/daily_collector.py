@@ -103,7 +103,12 @@ class DailyCollector:
             raise delayed
 
     def _collect_thread(self):
-        waiting=self.store.rows("SELECT * FROM daily_documents WHERE phase IN ('awaiting_confirmation','awaiting_images') ORDER BY created,message_id")
+        waiting=list(self.store.rows("SELECT * FROM daily_documents WHERE phase IN ('awaiting_confirmation','awaiting_images') ORDER BY created,message_id"))
+        if self.authority.config.get('qa'):
+            for row in self.store.rows("SELECT id,delivery FROM qa_jobs WHERE state='sent' AND created>? ORDER BY created DESC LIMIT 20", (self.store.now()-6*3600,)):
+                if not self.store.get('qa-thread-deleted:'+row['id']):
+                    notice=json.loads(row['delivery'])
+                    waiting.append(dict(phase='qa',message_id=row['id'],data='{}',notice=notice))
         if not waiting:
             return
         offset=self.store.get('thread_round_robin') or 0
@@ -113,6 +118,9 @@ class DailyCollector:
         if document['phase']=='awaiting_confirmation':
             parent=document['preview_message_id']
             origin=payload['preview']['sent']
+        elif document['phase']=='qa':
+            parent=document['notice']['message_id']
+            origin=document['notice']['receipt']
         else:
             parent=payload['image_notice']['message_id']
             origin=payload['image_notice']['receipt']
@@ -129,6 +137,9 @@ class DailyCollector:
                 raise ContractError('exact pending root message required')
             root=items[0]
             if root.get('deleted') is True:
+                if document['phase']=='qa':
+                    self.store.put('qa-thread-deleted:'+document['message_id'],True)
+                    return
                 self.store.advance(document['message_id'],document['phase'],'held',user_action='contact_codex',
                     reason='对应的确认消息已删除；资料和导读保留，请由 Codex 接续。')
                 return

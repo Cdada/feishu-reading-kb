@@ -138,12 +138,16 @@ class QAIndex:
                 continue
             hit = dict(meta, text=row['text'], char_start=row['start'], char_end=row['end'],
                        paragraph=row['paragraph'], heading=row['heading'], score=len(overlap)/len(terms))
+            hit['physical_pages'] = sorted({p['page'] for p in meta.get('pages', [])
+                                           if p['char_start'] < row['end'] and row['start'] < p['char_end']})
             hit['evidence_id'] = hashlib.sha256(encoded([meta['material_id'], meta['body_sha256'], row['start'], row['end']]).encode()).hexdigest()[:24]
             ranked.append((hit, row['rank']))
         ranked.sort(key=lambda pair: (-pair[0]['score'], pair[1], pair[0]['material_id'], pair[0]['char_start']))
         # Round-robin source diversity: a long paper must not crowd out others.
         buckets = {}
         for hit, _ in ranked:
+            if hit['material_id'] not in buckets and len(buckets) >= 8:
+                continue
             buckets.setdefault(hit['material_id'], []).append(hit)
         results = []
         while buckets and len(results) < limit:

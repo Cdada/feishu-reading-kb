@@ -19,6 +19,9 @@ COMMANDS = {
     'images': ('按缺图版本继续', '重新发文件'),
 }
 COMMANDS.update(RELATION_COMMANDS)
+from .qa_cards import COMMANDS as QA_COMMANDS, HEADER as QA_HEADER, checked_fields as qa_fields
+COMMANDS['qa'] = QA_COMMANDS
+HEADERS = dict(HEADERS, qa=QA_HEADER)
 
 
 def commands(binding):
@@ -79,6 +82,12 @@ def checked_binding(binding):
         _identity(binding['target_message_id'], 'om_')
         _digest(binding['source_sha256'])
         return dict(binding)
+    if binding['purpose'] == 'qa':
+        qa_fields(binding)
+        _identity(binding['document_id'], 'om_')
+        _identity(binding['target_message_id'], 'om_')
+        _digest(binding['source_sha256'])
+        return dict(binding)
     common = {'purpose', 'document_id', 'source_sha256', 'target_message_id'}
     extra = ({'publication_id', 'pdf_sha256', 'preview_version'}
              if binding['purpose'] == 'preview' else {'extraction_id', 'report_sha256'})
@@ -104,7 +113,7 @@ def render_card(card, *, result=None):
     title = card['title']
     if not isinstance(title, str) or not title.strip() or len(title.encode()) > 1024:
         raise ContractError('bounded nonempty card title required')
-    if binding['purpose'] in RELATION_COMMANDS:
+    if binding['purpose'] in RELATION_COMMANDS or binding['purpose'] == 'qa':
         detail = binding['details']
     elif binding['purpose'] == 'preview':
         detail = f"导读第 {binding['preview_version']} 版。请先查看本卡片所回复的导读 PDF，再选择。"

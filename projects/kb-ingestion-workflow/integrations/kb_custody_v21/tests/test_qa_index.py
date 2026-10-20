@@ -74,6 +74,12 @@ class QAIndexTests(unittest.TestCase):
         hits = self.index.search('城市演变', year_from=2010, year_to=2020)
         self.assertEqual({h['material_id'] for h in hits}, {'one'})
 
+    def test_trusted_page_map_only_labels_overlapping_physical_pages(self):
+        s = source(text='城市演变研究。\n\n访谈方法。', pages=[dict(page=7,char_start=0,char_end=7),dict(page=8,char_start=9,char_end=14)])
+        self.index.sync(Provider(s))
+        hits = self.index.search('城市演变')
+        self.assertEqual(hits[0]['physical_pages'],[7])
+
     def test_sql_and_fts_operators_are_data(self):
         self.index.sync(Provider(source()))
         self.assertEqual(self.index.search('" OR DROP TABLE qa_sources; -- nonexistent'), [])

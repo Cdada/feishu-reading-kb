@@ -36,6 +36,8 @@ class DailyAuthority:
             required.add('relations')
             if c['relations'] != dict(reference='P42-relations-v1', enabled=True) or not {'reading','cards'} <= set(c):
                 raise ContractError('explicit P42 relations with reading and cards required')
+        if 'qa' in c:
+            required.add('qa')
         if 'pdf' in c:
             required.add('pdf')
         if 'cards' in c:
@@ -77,6 +79,10 @@ class DailyAuthority:
         if 'reading' in c:
             from .reading_profile import ReadingProfile
             self.reading = ReadingProfile(self.runtime, c['reading'], self.frozen)
+        self.qa = None
+        if 'qa' in c:
+            from .qa_profile import QAProfile
+            self.qa = QAProfile(self, c['qa'])
         if 'pdf' in c:
             from .mineru_service import validate_pdf_config
             validate_pdf_config(c['pdf'], self.frozen)

@@ -35,6 +35,7 @@ class DailyScheduler:
         self.future = None
         self.last_poll = None
         self.closed = False
+        self.last_heavy_kind = 'archive'
 
     def _heartbeat(self, state, **details):
         self.store.put('heartbeat', dict(at=self.store.now(), state=state, **details))
@@ -73,6 +74,15 @@ class DailyScheduler:
     def _heavy_step(self, document):
         self.adapter.check_authorization()
         self._isolated(document, self.adapter.advance_heavy)
+
+    def _qa_step(self):
+        self.adapter.check_authorization()
+        try:
+            self.adapter.qa.step()
+        except (Deferred, StorageUnavailable) as error:
+            self.store.put('qa-wait', dict(reason=str(error), until=self.store.now()+self.store.policy.poll_seconds))
+        else:
+            self.store.put('qa-wait', None)
 
     def report_status(self):
         """One bounded report, also usable immediately before a trial stops."""
@@ -123,8 +133,15 @@ class DailyScheduler:
             self._isolated(document, self.adapter.advance_light)
         if self.future is None and not self.stop.is_set():
             document = next(self._documents(HEAVY_PHASES), None)
-            if document is not None:
+            qa = getattr(self.adapter, 'qa', None)
+            waiting = self.store.get('qa-wait') or {}
+            qa_ready = qa is not None and waiting.get('until', 0) <= self.store.now() and qa.pending()
+            if qa_ready and (document is None or self.last_heavy_kind == 'archive'):
+                self.future = self.pool.submit(self._qa_step)
+                self.last_heavy_kind = 'qa'
+            elif document is not None:
                 self.future = self.pool.submit(self._heavy_step, document)
+                self.last_heavy_kind = 'archive'
         self._heartbeat('running', heavy_active=self.future is not None,
                         collection_wait=self.store.get('collection_wait'))
         return True

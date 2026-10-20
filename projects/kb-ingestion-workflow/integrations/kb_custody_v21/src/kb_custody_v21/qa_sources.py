@@ -36,21 +36,47 @@ class QASources:
         if file_sha(source_path) != detail['input_file_sha256']:
             raise ContractError('已复核的整理输入发生变化。')
         source = json.loads(source_path.read_bytes())['source']
+        receipt_path = no_symlinks(expected_parent/'publication/published.local.json')
+        if receipt_path.stat().st_size > 4*1024*1024:
+            raise ContractError('入库文件清单超出问答范围。')
+        published = json.loads(receipt_path.read_bytes())
+        if sha(published) != detail['publication_receipt']:
+            raise ContractError('已完成入库的文件清单发生变化。')
         root = self.authority.reading.root
         fd = open_root(root, root_identity(root))
         try:
             meta, meta_raw = read_json_at(fd, item['group']+'/metadata.json')
             body_path = item['group']+'/入库依据/提取/source.md'
             raw = read_at(fd, body_path, limit=1024*1024)
+            map_path = item['group']+'/入库依据/提取/extraction-map.json'
+            map_raw = read_at(fd, map_path, limit=4*1024*1024) if map_path in published['files'] else None
         finally:
             os.close(fd)
         if (source['binding'] != material['binding'] or sha(source) != meta['input_sha256']
                 or raw is None or raw != source['original'].encode()):
             raise ContractError('已入库原文与复核输入不一致，请核查后再问答。')
         text = raw.decode()
+        pages = []
+        if map_raw is not None:
+            if hashlib.sha256(map_raw).hexdigest() != published['files'][map_path]['sha256']:
+                raise ContractError('已入库页码映射发生变化。')
+            mapping = json.loads(map_raw)
+            if (mapping.get('output_sha256') != hashlib.sha256(raw).hexdigest()
+                    or mapping.get('source_sha256') != item['source_sha256']
+                    or mapping.get('offset_unit') != 'unicode_code_point'
+                    or mapping.get('range_convention') != 'half_open'):
+                raise ContractError('页码映射与当前原文不匹配。')
+            for p in mapping.get('page_mappings', []):
+                for r in p['text_ranges']:
+                    if type(p['page_index']) is not int or not 0 <= p['page_index'] < 10000 or not 0 <= r['char_start'] < r['char_end'] <= len(text):
+                        raise ContractError('物理页码范围无效。')
+                    pages.append(dict(page=p['page_index']+1, **r))
         policy = source.get('provenance', {}).get('evidence_policy')
         excluded = checked_policy(policy, text)
         record = meta.get('provenance', {}).get('source_record', {})
+        role = record.get('document_role', 'unknown')
+        item['document_role'] = role
+        item['is_paper'] = item['is_paper'] and role == 'canonical_fulltext'
         year = record.get('work', {}).get('publication_year')
         if type(year) is not int or not 1000 <= year <= 9999:
             year = None
@@ -62,13 +88,16 @@ class QASources:
             raise ContractError('问答需要唯一的已完成整理事件。')
         evidence = {str(source_path): detail['input_file_sha256'],
                     str(root/body_path): hashlib.sha256(raw).hexdigest(),
-                    str(root/item['group']/'metadata.json'): hashlib.sha256(meta_raw).hexdigest()}
+                    str(root/item['group']/'metadata.json'): hashlib.sha256(meta_raw).hexdigest(),
+                    str(receipt_path): file_sha(receipt_path)}
+        if map_raw is not None:
+            evidence[str(root/map_path)] = hashlib.sha256(map_raw).hexdigest()
         return dict(item, text=text, body_sha256=hashlib.sha256(raw).hexdigest(),
                     publication_year=year, released_at=release, ingested_at=completed[0],
                     brief_visibility=meta.get('brief_visibility', 'exclude'),
                     completeness=meta.get('source_completeness', 'unknown'),
                     content_nature=meta.get('content_nature', 'unknown'),
-                    source_path=body_path, excluded_ranges=excluded, evidence=evidence)
+                    source_path=body_path, excluded_ranges=excluded, pages=pages, evidence=evidence)
 
     def verify(self, hits):
         """Re-read selected originals at the model and delivery boundaries."""

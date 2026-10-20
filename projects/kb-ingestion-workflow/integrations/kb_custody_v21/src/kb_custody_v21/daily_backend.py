@@ -56,6 +56,10 @@ class DailyBackend:
         if 'relations' in authority.config:
             from .relation_flow import RelationFlow
             self.relations = RelationFlow(self)
+        self.qa = None
+        if getattr(authority, 'qa', None) is not None:
+            from .qa_flow import QAFlow
+            self.qa = QAFlow(self)
         self.pdf_converter = None
         self.pdf_chunks = None
         self.pdf_progress = None
@@ -212,6 +216,8 @@ class DailyBackend:
             if not self.store.get('reported:'+key):
                 self.notice(key,'正文累计额度已用完，已保存的材料会继续保留。已发 PDF 仍可确认入库；请在 Codex 集中补充正文额度。',purpose='service',confirmation=True)
                 self.store.put('reported:'+key,True)
+        if self.qa is not None:
+            self.qa.report()
 
     def collect(self):
         if self.card_listener is not None:
@@ -229,7 +235,10 @@ class DailyBackend:
                 self.store.put('card_listener_wait', dict(reason=error.reason, until=error.until))
             else:
                 self.store.put('card_listener_wait', None)
-        return self.collector.collect()
+        result = self.collector.collect()
+        if self.qa is not None:
+            self.qa.collect()
+        return result
 
     def _check_material(self, document):
         self.check_authorization()

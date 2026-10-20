@@ -24,7 +24,7 @@ def parse(text, context=None):
         return dict(mode='reset', question='', selected=[])
     if text.startswith(('本周周报', '上周周报', '周报')):
         return dict(mode='weekly', question=text, selected=[])
-    mode = 'answer'
+    mode = 'search' if re.search(r'哪些.*文献|相关.*文献|有哪些.*资料', text) else 'source' if re.search(r'哪[份篇个].*(?:文件|材料|文档)|出处', text) else 'answer'
     for prefix, value in MODES.items():
         if text.startswith(prefix):
             mode, text = value, text[len(prefix):].lstrip(' ：:')
@@ -57,8 +57,8 @@ def parse(text, context=None):
     if re.search(r'最新|现行|目前有效|现在有效', text) and not selected:
         return dict(mode='version', question=text, selected=[], year_from=year_from, year_to=year_to)
     # User question history is retrieval context, never factual evidence.
-    query = (context['question']+' '+text if mode == 'followup' else text)
-    query = re.sub(r'请|帮我|目前|关于|有哪些|相关的|相关|文献|研究成果|相应的|阐述|知识库|记录了哪些|是什么|这个问题|怎么|如何|在', ' ', query)
+    query = (context.get('question', '')+' '+text if mode in ('followup', 'compare') else text)
+    query = re.sub(r'请|帮我|目前|关于|有哪些|相关的|相关|文献|研究成果|相应的|阐述|知识库|记录了哪些|是什么|这个问题|怎么|如何', ' ', query)
     if mode == 'tools':
         query += ' 工具 软件'
     return dict(mode=mode, question=text.strip(), query=query.strip(), selected=selected,
@@ -68,8 +68,12 @@ def parse(text, context=None):
 
 def citation(hit, number):
     kind = '论文原文' if hit['is_paper'] else '来源材料（未认定为论文原文）'
+    if hit.get('document_role') in ('secondary_summary', 'abstract', 'notes'):
+        kind = {'secondary_summary':'摘要/解读', 'abstract':'摘要', 'notes':'笔记'}[hit['document_role']]
     year = str(hit['publication_year']) if hit['publication_year'] else '发表时间未记录'
     where = ('“'+hit['heading']+'” · ' if hit['heading'] else '')+f"第 {hit['paragraph']} 段，字符 {hit['char_start']}–{hit['char_end']}"
+    if hit.get('physical_pages'):
+        where = 'PDF 物理页 '+','.join(map(str, hit['physical_pages']))+' · '+where
     return f"[{number}] {hit['title']}｜{kind}｜{year}\n{where}\n版本 {hit['body_sha256'][:12]}"
 
 

@@ -11,10 +11,18 @@ import (
 )
 
 func cardControl(t *testing.T, mode string) Control {
+	return cardControlTarget(t, mode, "file")
+}
+
+func cardControlTarget(t *testing.T, mode, targetType string) Control {
+	return cardControlTarget(t, mode, "file")
+}
+
+func cardControlTarget(t *testing.T, mode, targetType string) Control {
 	old := pilotList(dailyControl(t))
 	rebindDaily(t, &old)
 	g := guard(t, old)
-	success(t, g, get(old), `{"code":0,"data":{"has_more":false,"items":[{"message_id":"om_pdf","chat_id":"oc_synthetic","msg_type":"file","deleted":false,"updated":false,"sender":{"id":"ou_synthetic_bot","id_type":"open_id","sender_type":"app"}},{"message_id":"om_card","parent_id":"om_pdf","chat_id":"oc_synthetic","msg_type":"interactive","deleted":false,"updated":false,"sender":{"id":"ou_synthetic_bot","id_type":"open_id","sender_type":"app"}}]}}`)
+	success(t, g, get(old), `{"code":0,"data":{"has_more":false,"items":[{"message_id":"om_pdf","chat_id":"oc_synthetic","msg_type":"`+targetType+`","deleted":false,"updated":false,"sender":{"id":"ou_synthetic_bot","id_type":"open_id","sender_type":"app"}},{"message_id":"om_card","parent_id":"om_pdf","chat_id":"oc_synthetic","msg_type":"interactive","deleted":false,"updated":false,"sender":{"id":"ou_synthetic_bot","id_type":"open_id","sender_type":"app"}}]}}`)
 	g.Close()
 	receipt := filepath.Join(old.Root, old.Key+".response.local")
 	for _, path := range []string{receipt, filepath.Join(old.Root, "http.local.jsonl")} {
