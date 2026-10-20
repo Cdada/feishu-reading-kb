@@ -1,0 +1,15 @@
+{
+  "name": "private-reading-guide",
+  "revision": "2026-09-30-v2.1",
+  "package_sha256": "82f6abf323c99f5fbae7a02862167af739e15ba311cb5d3a2c2da7266cf6a701",
+  "files": {
+    "CHANGELOG.md": "5e5f02569c5c9919f9ab9038fd0571b7786665aba42e78e2b6ed82236efb5cab",
+    "SKILL.md": "9f0417084103c32b11caac16429ec313f7d158ac84497ddda4b95f268bba0dac",
+    "references/source-discipline.md": "07411f4874f92dbaef52723ecbdb0756bca4255a14ae9d0c4433f2b19586eed0",
+    "references/style-guide.md": "6bb07bbccf95ce03439fadfa9c37ad247e475540fb2950c80487f4af5a34f7b7",
+    "references/v2.1-integration.md": "ddab41004cd5aa3d1256abbd8beea021a01c33cbf4d4f8218288444e4101db18",
+    "references/input-checklist.md": "8269f913820d873f8ea55ba994374b873e01328a2f9564988cf6f31fd8850c12",
+    "assets/human-preview-reading-section-template.md": "30b910626b5b88c242874532cc6393bc40b6bc7f270de5b23b913e9d516b5820",
+    "assets/kindle-guide-template.md": "fe5d6bd234259f9d7810d11d8420c160ac6a1271001bc06ff7596bbe3f57bec1"
+  }
+}

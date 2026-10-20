@@ -1,0 +1,9 @@
+{
+  "source": "https://www.postman.com/feishu-op/feishu-s-public-workspace/request/e9q6lc8/",
+  "official_document": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/chat/update",
+  "reviewed_on": "2026-10-02",
+  "method": "PUT",
+  "path_template": "/open-apis/im/v1/chats/{chat_id}",
+  "approved_body": {"add_member_permission": "only_owner", "share_card_permission": "not_allowed"},
+  "note": "Minimal independently reviewed API contract, no real identifiers. CLI schema validates body fields and scopes but does not expose the HTTP method. Offline CI never fetches this source."
+}

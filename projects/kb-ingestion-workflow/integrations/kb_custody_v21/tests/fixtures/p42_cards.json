@@ -1,0 +1,798 @@
+[
+  {
+    "card": {
+      "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "binding": {
+        "purpose": "relation_candidates",
+        "document_id": "om_synthetic",
+        "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "target_message_id": "om_preview",
+        "material_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "details": "合成资料 “保持原文”\n候选与依据；不代表同一版本。",
+        "revision": 0,
+        "candidate_count": 0
+      },
+      "title": "入库后的资料关联",
+      "result": ""
+    },
+    "rendered": {
+      "schema": "2.0",
+      "config": {
+        "width_mode": "default",
+        "update_multi": true,
+        "enable_forward": false
+      },
+      "header": {
+        "title": {
+          "tag": "plain_text",
+          "content": "选择可能关联的资料"
+        },
+        "template": "blue",
+        "icon": {
+          "tag": "standard_icon",
+          "token": "approval_colorful"
+        }
+      },
+      "body": {
+        "direction": "vertical",
+        "vertical_spacing": "8px",
+        "elements": [
+          {
+            "tag": "div",
+            "text": {
+              "tag": "plain_text",
+              "content": "入库后的资料关联",
+              "text_size": "heading-3"
+            }
+          },
+          {
+            "tag": "div",
+            "text": {
+              "tag": "plain_text",
+              "content": "合成资料 “保持原文”\n候选与依据；不代表同一版本。"
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "card": {
+      "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "binding": {
+        "purpose": "relation_candidates",
+        "document_id": "om_synthetic",
+        "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "target_message_id": "om_preview",
+        "material_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "details": "合成资料 “保持原文”\n候选与依据；不代表同一版本。",
+        "revision": 0,
+        "candidate_count": 0
+      },
+      "title": "入库后的资料关联",
+      "result": "已核验双向链接。"
+    },
+    "rendered": {
+      "schema": "2.0",
+      "config": {
+        "width_mode": "default",
+        "update_multi": true,
+        "enable_forward": false
+      },
+      "header": {
+        "title": {
+          "tag": "plain_text",
+          "content": "选择可能关联的资料"
+        },
+        "template": "blue",
+        "icon": {
+          "tag": "standard_icon",
+          "token": "approval_colorful"
+        }
+      },
+      "body": {
+        "direction": "vertical",
+        "vertical_spacing": "8px",
+        "elements": [
+          {
+            "tag": "div",
+            "text": {
+              "tag": "plain_text",
+              "content": "入库后的资料关联",
+              "text_size": "heading-3"
+            }
+          },
+          {
+            "tag": "div",
+            "text": {
+              "tag": "plain_text",
+              "content": "合成资料 “保持原文”\n候选与依据；不代表同一版本。"
+            }
+          },
+          {
+            "tag": "div",
+            "text": {
+              "tag": "plain_text",
+              "content": "已核验双向链接。"
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "card": {
+      "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "binding": {
+        "purpose": "relation_candidates",
+        "document_id": "om_synthetic",
+        "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "target_message_id": "om_preview",
+        "material_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "details": "合成资料 “保持原文”\n候选与依据；不代表同一版本。",
+        "revision": 0,
+        "candidate_count": 5
+      },
+      "title": "入库后的资料关联",
+      "result": ""
+    },
+    "rendered": {
+      "schema": "2.0",
+      "config": {
+        "width_mode": "default",
+        "update_multi": true,
+        "enable_forward": false
+      },
+      "header": {
+        "title": {
+          "tag": "plain_text",
+          "content": "选择可能关联的资料"
+        },
+        "template": "blue",
+        "icon": {
+          "tag": "standard_icon",
+          "token": "approval_colorful"
+        }
+      },
+      "body": {
+        "direction": "vertical",
+        "vertical_spacing": "8px",
+        "elements": [
+          {
+            "tag": "div",
+            "text": {
+              "tag": "plain_text",
+              "content": "入库后的资料关联",
+              "text_size": "heading-3"
+            }
+          },
+          {
+            "tag": "div",
+            "text": {
+              "tag": "plain_text",
+              "content": "合成资料 “保持原文”\n候选与依据；不代表同一版本。"
+            }
+          },
+          {
+            "tag": "button",
+            "text": {
+              "tag": "plain_text",
+              "content": "候选 1"
+            },
+            "type": "primary_filled",
+            "width": "fill",
+            "behaviors": [
+              {
+                "type": "callback",
+                "value": {
+                  "reference": "P40-card-v1",
+                  "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                  "command": "候选 1"
+                }
+              }
+            ]
+          },
+          {
+            "tag": "button",
+            "text": {
+              "tag": "plain_text",
+              "content": "候选 2"
+            },
+            "type": "default",
+            "width": "fill",
+            "behaviors": [
+              {
+                "type": "callback",
+                "value": {
+                  "reference": "P40-card-v1",
+                  "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                  "command": "候选 2"
+                }
+              }
+            ]
+          },
+          {
+            "tag": "button",
+            "text": {
+              "tag": "plain_text",
+              "content": "候选 3"
+            },
+            "type": "default",
+            "width": "fill",
+            "behaviors": [
+              {
+                "type": "callback",
+                "value": {
+                  "reference": "P40-card-v1",
+                  "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                  "command": "候选 3"
+                }
+              }
+            ]
+          },
+          {
+            "tag": "button",
+            "text": {
+              "tag": "plain_text",
+              "content": "候选 4"
+            },
+            "type": "default",
+            "width": "fill",
+            "behaviors": [
+              {
+                "type": "callback",
+                "value": {
+                  "reference": "P40-card-v1",
+                  "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                  "command": "候选 4"
+                }
+              }
+            ]
+          },
+          {
+            "tag": "button",
+            "text": {
+              "tag": "plain_text",
+              "content": "候选 5"
+            },
+            "type": "default",
+            "width": "fill",
+            "behaviors": [
+              {
+                "type": "callback",
+                "value": {
+                  "reference": "P40-card-v1",
+                  "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                  "command": "候选 5"
+                }
+              }
+            ]
+          },
+          {
+            "tag": "button",
+            "text": {
+              "tag": "plain_text",
+              "content": "结束关联"
+            },
+            "type": "default",
+            "width": "fill",
+            "behaviors": [
+              {
+                "type": "callback",
+                "value": {
+                  "reference": "P40-card-v1",
+                  "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                  "command": "结束关联"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "card": {
+      "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "binding": {
+        "purpose": "relation_candidates",
+        "document_id": "om_synthetic",
+        "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "target_message_id": "om_preview",
+        "material_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "details": "合成资料 “保持原文”\n候选与依据；不代表同一版本。",
+        "revision": 0,
+        "candidate_count": 5
+      },
+      "title": "入库后的资料关联",
+      "result": "已核验双向链接。"
+    },
+    "rendered": {
+      "schema": "2.0",
+      "config": {
+        "width_mode": "default",
+        "update_multi": true,
+        "enable_forward": false
+      },
+      "header": {
+        "title": {
+          "tag": "plain_text",
+          "content": "选择可能关联的资料"
+        },
+        "template": "blue",
+        "icon": {
+          "tag": "standard_icon",
+          "token": "approval_colorful"
+        }
+      },
+      "body": {
+        "direction": "vertical",
+        "vertical_spacing": "8px",
+        "elements": [
+          {
+            "tag": "div",
+            "text": {
+              "tag": "plain_text",
+              "content": "入库后的资料关联",
+              "text_size": "heading-3"
+            }
+          },
+          {
+            "tag": "div",
+            "text": {
+              "tag": "plain_text",
+              "content": "合成资料 “保持原文”\n候选与依据；不代表同一版本。"
+            }
+          },
+          {
+            "tag": "div",
+            "text": {
+              "tag": "plain_text",
+              "content": "已核验双向链接。"
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "card": {
+      "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "binding": {
+        "purpose": "relation_type",
+        "document_id": "om_synthetic",
+        "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "target_message_id": "om_preview",
+        "material_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "details": "合成资料 “保持原文”\n候选与依据；不代表同一版本。",
+        "revision": 0,
+        "pair_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "title": "入库后的资料关联",
+      "result": ""
+    },
+    "rendered": {
+      "schema": "2.0",
+      "config": {
+        "width_mode": "default",
+        "update_multi": true,
+        "enable_forward": false
+      },
+      "header": {
+        "title": {
+          "tag": "plain_text",
+          "content": "确认资料关系"
+        },
+        "template": "blue",
+        "icon": {
+          "tag": "standard_icon",
+          "token": "approval_colorful"
+        }
+      },
+      "body": {
+        "direction": "vertical",
+        "vertical_spacing": "8px",
+        "elements": [
+          {
+            "tag": "div",
+            "text": {
+              "tag": "plain_text",
+              "content": "入库后的资料关联",
+              "text_size": "heading-3"
+            }
+          },
+          {
+            "tag": "div",
+            "text": {
+              "tag": "plain_text",
+              "content": "合成资料 “保持原文”\n候选与依据；不代表同一版本。"
+            }
+          },
+          {
+            "tag": "button",
+            "text": {
+              "tag": "plain_text",
+              "content": "本篇是解读，候选是原文"
+            },
+            "type": "primary_filled",
+            "width": "fill",
+            "behaviors": [
+              {
+                "type": "callback",
+                "value": {
+                  "reference": "P40-card-v1",
+                  "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                  "command": "本篇是解读，候选是原文"
+                }
+              }
+            ]
+          },
+          {
+            "tag": "button",
+            "text": {
+              "tag": "plain_text",
+              "content": "候选是解读，本篇是原文"
+            },
+            "type": "default",
+            "width": "fill",
+            "behaviors": [
+              {
+                "type": "callback",
+                "value": {
+                  "reference": "P40-card-v1",
+                  "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                  "command": "候选是解读，本篇是原文"
+                }
+              }
+            ]
+          },
+          {
+            "tag": "button",
+            "text": {
+              "tag": "plain_text",
+              "content": "本篇是摘要或摘录，候选是原文"
+            },
+            "type": "default",
+            "width": "fill",
+            "behaviors": [
+              {
+                "type": "callback",
+                "value": {
+                  "reference": "P40-card-v1",
+                  "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                  "command": "本篇是摘要或摘录，候选是原文"
+                }
+              }
+            ]
+          },
+          {
+            "tag": "button",
+            "text": {
+              "tag": "plain_text",
+              "content": "候选是摘要或摘录，本篇是原文"
+            },
+            "type": "default",
+            "width": "fill",
+            "behaviors": [
+              {
+                "type": "callback",
+                "value": {
+                  "reference": "P40-card-v1",
+                  "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                  "command": "候选是摘要或摘录，本篇是原文"
+                }
+              }
+            ]
+          },
+          {
+            "tag": "button",
+            "text": {
+              "tag": "plain_text",
+              "content": "本篇是修订版，候选是旧版"
+            },
+            "type": "default",
+            "width": "fill",
+            "behaviors": [
+              {
+                "type": "callback",
+                "value": {
+                  "reference": "P40-card-v1",
+                  "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                  "command": "本篇是修订版，候选是旧版"
+                }
+              }
+            ]
+          },
+          {
+            "tag": "button",
+            "text": {
+              "tag": "plain_text",
+              "content": "候选是修订版，本篇是旧版"
+            },
+            "type": "default",
+            "width": "fill",
+            "behaviors": [
+              {
+                "type": "callback",
+                "value": {
+                  "reference": "P40-card-v1",
+                  "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                  "command": "候选是修订版，本篇是旧版"
+                }
+              }
+            ]
+          },
+          {
+            "tag": "button",
+            "text": {
+              "tag": "plain_text",
+              "content": "仅主题相关"
+            },
+            "type": "default",
+            "width": "fill",
+            "behaviors": [
+              {
+                "type": "callback",
+                "value": {
+                  "reference": "P40-card-v1",
+                  "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                  "command": "仅主题相关"
+                }
+              }
+            ]
+          },
+          {
+            "tag": "button",
+            "text": {
+              "tag": "plain_text",
+              "content": "取消本次关联"
+            },
+            "type": "default",
+            "width": "fill",
+            "behaviors": [
+              {
+                "type": "callback",
+                "value": {
+                  "reference": "P40-card-v1",
+                  "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                  "command": "取消本次关联"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "card": {
+      "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "binding": {
+        "purpose": "relation_type",
+        "document_id": "om_synthetic",
+        "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "target_message_id": "om_preview",
+        "material_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "details": "合成资料 “保持原文”\n候选与依据；不代表同一版本。",
+        "revision": 0,
+        "pair_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "title": "入库后的资料关联",
+      "result": "已核验双向链接。"
+    },
+    "rendered": {
+      "schema": "2.0",
+      "config": {
+        "width_mode": "default",
+        "update_multi": true,
+        "enable_forward": false
+      },
+      "header": {
+        "title": {
+          "tag": "plain_text",
+          "content": "确认资料关系"
+        },
+        "template": "blue",
+        "icon": {
+          "tag": "standard_icon",
+          "token": "approval_colorful"
+        }
+      },
+      "body": {
+        "direction": "vertical",
+        "vertical_spacing": "8px",
+        "elements": [
+          {
+            "tag": "div",
+            "text": {
+              "tag": "plain_text",
+              "content": "入库后的资料关联",
+              "text_size": "heading-3"
+            }
+          },
+          {
+            "tag": "div",
+            "text": {
+              "tag": "plain_text",
+              "content": "合成资料 “保持原文”\n候选与依据；不代表同一版本。"
+            }
+          },
+          {
+            "tag": "div",
+            "text": {
+              "tag": "plain_text",
+              "content": "已核验双向链接。"
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "card": {
+      "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "binding": {
+        "purpose": "relation_manage",
+        "document_id": "om_synthetic",
+        "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "target_message_id": "om_preview",
+        "material_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "details": "合成资料 “保持原文”\n候选与依据；不代表同一版本。",
+        "revision": 0,
+        "pair_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "title": "入库后的资料关联",
+      "result": ""
+    },
+    "rendered": {
+      "schema": "2.0",
+      "config": {
+        "width_mode": "default",
+        "update_multi": true,
+        "enable_forward": false
+      },
+      "header": {
+        "title": {
+          "tag": "plain_text",
+          "content": "管理已确认关联"
+        },
+        "template": "blue",
+        "icon": {
+          "tag": "standard_icon",
+          "token": "approval_colorful"
+        }
+      },
+      "body": {
+        "direction": "vertical",
+        "vertical_spacing": "8px",
+        "elements": [
+          {
+            "tag": "div",
+            "text": {
+              "tag": "plain_text",
+              "content": "入库后的资料关联",
+              "text_size": "heading-3"
+            }
+          },
+          {
+            "tag": "div",
+            "text": {
+              "tag": "plain_text",
+              "content": "合成资料 “保持原文”\n候选与依据；不代表同一版本。"
+            }
+          },
+          {
+            "tag": "button",
+            "text": {
+              "tag": "plain_text",
+              "content": "更正关联"
+            },
+            "type": "primary_filled",
+            "width": "fill",
+            "behaviors": [
+              {
+                "type": "callback",
+                "value": {
+                  "reference": "P40-card-v1",
+                  "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                  "command": "更正关联"
+                }
+              }
+            ]
+          },
+          {
+            "tag": "button",
+            "text": {
+              "tag": "plain_text",
+              "content": "撤销关联"
+            },
+            "type": "default",
+            "width": "fill",
+            "behaviors": [
+              {
+                "type": "callback",
+                "value": {
+                  "reference": "P40-card-v1",
+                  "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                  "command": "撤销关联"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "card": {
+      "card_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "binding": {
+        "purpose": "relation_manage",
+        "document_id": "om_synthetic",
+        "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "target_message_id": "om_preview",
+        "material_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "details": "合成资料 “保持原文”\n候选与依据；不代表同一版本。",
+        "revision": 0,
+        "pair_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "title": "入库后的资料关联",
+      "result": "已核验双向链接。"
+    },
+    "rendered": {
+      "schema": "2.0",
+      "config": {
+        "width_mode": "default",
+        "update_multi": true,
+        "enable_forward": false
+      },
+      "header": {
+        "title": {
+          "tag": "plain_text",
+          "content": "管理已确认关联"
+        },
+        "template": "blue",
+        "icon": {
+          "tag": "standard_icon",
+          "token": "approval_colorful"
+        }
+      },
+      "body": {
+        "direction": "vertical",
+        "vertical_spacing": "8px",
+        "elements": [
+          {
+            "tag": "div",
+            "text": {
+              "tag": "plain_text",
+              "content": "入库后的资料关联",
+              "text_size": "heading-3"
+            }
+          },
+          {
+            "tag": "div",
+            "text": {
+              "tag": "plain_text",
+              "content": "合成资料 “保持原文”\n候选与依据；不代表同一版本。"
+            }
+          },
+          {
+            "tag": "div",
+            "text": {
+              "tag": "plain_text",
+              "content": "已核验双向链接。"
+            }
+          }
+        ]
+      }
+    }
+  }
+]

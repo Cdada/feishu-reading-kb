@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kb-ingestion-workflow.local/schemas/conversion-request-v1.schema.json",
+  "title": "KB Conversion Request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_id",
+    "attempt",
+    "selected_mode",
+    "source",
+    "intent",
+    "parser",
+    "constraints"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "kb-conversion.request/v1"
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{7,127}$"
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "selected_mode": {
+      "$ref": "#/$defs/selectedMode"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "filename",
+        "source_relpath",
+        "sha256",
+        "media_type",
+        "size_bytes"
+      ],
+      "properties": {
+        "filename": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "source_relpath": {
+          "$ref": "#/$defs/sourceRelpath"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256Hex"
+        },
+        "media_type": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9.+-]+/[A-Za-z0-9.+-]+$"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_note_type",
+        "focus",
+        "template_version",
+        "language",
+        "conversion_mode"
+      ],
+      "properties": {
+        "target_note_type": {
+          "$ref": "#/$defs/targetNoteType"
+        },
+        "focus": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "maxItems": 12,
+          "uniqueItems": true
+        },
+        "template_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[A-Za-z0-9_.:-]+$"
+        },
+        "language": {
+          "type": "string",
+          "enum": [
+            "zh-CN",
+            "zh-TW",
+            "en-US"
+          ]
+        },
+        "conversion_mode": {
+          "$ref": "#/$defs/conversionMode"
+        }
+      }
+    },
+    "parser": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "backend",
+        "parse_method",
+        "language"
+      ],
+      "properties": {
+        "backend": {
+          "type": "string",
+          "enum": [
+            "pipeline"
+          ]
+        },
+        "parse_method": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "txt",
+            "ocr"
+          ]
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preserve_facts",
+        "no_external_expansion",
+        "distinguish_source_and_inference",
+        "preserve_source_traceability",
+        "output_candidate_only"
+      ],
+      "properties": {
+        "preserve_facts": {
+          "type": "boolean",
+          "const": true
+        },
+        "no_external_expansion": {
+          "type": "boolean",
+          "const": true
+        },
+        "distinguish_source_and_inference": {
+          "type": "boolean",
+          "const": true
+        },
+        "preserve_source_traceability": {
+          "type": "boolean",
+          "const": true
+        },
+        "output_candidate_only": {
+          "type": "boolean",
+          "const": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "selectedMode": {
+      "type": "string",
+      "enum": [
+        "local-existing",
+        "dify-experimental"
+      ]
+    },
+    "targetNoteType": {
+      "type": "string",
+      "enum": [
+        "concept",
+        "topic",
+        "project",
+        "auto"
+      ]
+    },
+    "conversionMode": {
+      "type": "string",
+      "enum": [
+        "strict",
+        "normal"
+      ]
+    },
+    "sha256Hex": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "sourceRelpath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$)).+"
+    }
+  }
+}

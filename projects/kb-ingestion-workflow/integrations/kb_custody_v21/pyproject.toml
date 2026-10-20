@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kb-custody-v21-dev"
+version = "0.1.0"
+license = {text = "MIT"}
+authors = [{name = "dadaism-Cx"}]
+description = "Isolated V2.1 custody, conversion and publication development"
+requires-python = ">=3.12"
+dependencies = ["markdown-it-py==3.0.0", "Pillow==12.3.0", "reportlab==4.4.9", "pypdf==6.10.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+kb_custody_v21 = ["schema.sql"]

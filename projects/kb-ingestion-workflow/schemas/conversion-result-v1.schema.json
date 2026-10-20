@@ -1,0 +1,515 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kb-ingestion-workflow.local/schemas/conversion-result-v1.schema.json",
+  "title": "KB Conversion Result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "selected_mode",
+    "task",
+    "source",
+    "backend",
+    "parser",
+    "candidate",
+    "quality",
+    "failure"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "kb-conversion.result/v1"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "succeeded",
+        "failed",
+        "needs_review"
+      ]
+    },
+    "selected_mode": {
+      "$ref": "#/$defs/selectedMode"
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "attempt",
+        "idempotency_key",
+        "started_at",
+        "finished_at"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{7,127}$"
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "idempotency_key": {
+          "$ref": "#/$defs/prefixedSha256"
+        },
+        "started_at": {
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 40
+        },
+        "finished_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 20,
+          "maxLength": 40
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "filename",
+        "source_relpath",
+        "sha256"
+      ],
+      "properties": {
+        "filename": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "source_relpath": {
+          "$ref": "#/$defs/sourceRelpath"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256Hex"
+        }
+      }
+    },
+    "backend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "workflow_version",
+        "converter_version",
+        "fallback_used",
+        "fallback_from",
+        "fallback_reason",
+        "warnings"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "enum": [
+            "local-existing",
+            "dify-mineru-api"
+          ]
+        },
+        "workflow_version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 120
+        },
+        "converter_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "fallback_used": {
+          "const": false
+        },
+        "fallback_from": {
+          "type": "null"
+        },
+        "fallback_reason": {
+          "type": "null"
+        },
+        "warnings": {
+          "$ref": "#/$defs/warnings"
+        }
+      }
+    },
+    "parser": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "task_id",
+        "backend",
+        "parse_method"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "enum": [
+            "MinerU",
+            "local-existing"
+          ]
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 120
+        },
+        "task_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "backend": {
+          "type": "string",
+          "enum": [
+            "pipeline",
+            "direct"
+          ]
+        },
+        "parse_method": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "txt",
+            "ocr",
+            "direct"
+          ]
+        }
+      }
+    },
+    "candidate": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "note_type",
+        "markdown",
+        "markdown_relpath",
+        "template_version",
+        "content_sha256",
+        "review_status",
+        "source_points",
+        "inferences",
+        "unresolved_issues"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "note_type": {
+          "$ref": "#/$defs/targetNoteType"
+        },
+        "markdown": {
+          "type": "string",
+          "minLength": 1
+        },
+        "markdown_relpath": {
+          "$ref": "#/$defs/sourceRelpath"
+        },
+        "template_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "pattern": "^[A-Za-z0-9_.:-]+$"
+        },
+        "content_sha256": {
+          "$ref": "#/$defs/prefixedSha256"
+        },
+        "review_status": {
+          "type": "string",
+          "enum": [
+            "candidate",
+            "needs_review"
+          ]
+        },
+        "source_points": {
+          "$ref": "#/$defs/sourcePointList"
+        },
+        "inferences": {
+          "$ref": "#/$defs/textList"
+        },
+        "unresolved_issues": {
+          "$ref": "#/$defs/textList"
+        }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_valid",
+        "source_markers_present",
+        "warnings"
+      ],
+      "properties": {
+        "schema_valid": {
+          "type": "boolean"
+        },
+        "source_markers_present": {
+          "type": "boolean"
+        },
+        "warnings": {
+          "$ref": "#/$defs/warnings"
+        }
+      }
+    },
+    "failure": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "code",
+        "message",
+        "retryable",
+        "stderr_excerpt"
+      ],
+      "properties": {
+        "stage": {
+          "type": "string",
+          "enum": [
+            "input_validation",
+            "dify_upload",
+            "dify_run",
+            "mineru_submit",
+            "mineru_poll",
+            "mineru_result",
+            "result_validation",
+            "quality_gate",
+            "manual_review",
+            "local_existing_process",
+            "local_existing_check"
+          ]
+        },
+        "code": {
+          "$ref": "#/$defs/standardErrorCode"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "stderr_excerpt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 4000
+        }
+      }
+    }
+  },
+  "$defs": {
+    "selectedMode": {
+      "type": "string",
+      "enum": [
+        "local-existing",
+        "dify-experimental"
+      ]
+    },
+    "targetNoteType": {
+      "type": "string",
+      "enum": [
+        "concept",
+        "topic",
+        "project",
+        "auto"
+      ]
+    },
+    "sha256Hex": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "prefixedSha256": {
+      "type": "string",
+      "pattern": "^sha256:[A-Fa-f0-9]{64}$"
+    },
+    "sourceRelpath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.(?:/|$)).+"
+    },
+    "sourcePointList": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1000
+      },
+      "minItems": 1,
+      "maxItems": 100
+    },
+    "textList": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1000
+      },
+      "maxItems": 100
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1000
+      },
+      "maxItems": 100
+    },
+    "standardErrorCode": {
+      "type": "string",
+      "enum": [
+        "INPUT_UNSUPPORTED",
+        "DIFY_UPLOAD_TOO_LARGE",
+        "DIFY_API_UNAVAILABLE",
+        "DIFY_SSRF_BLOCKED",
+        "MINERU_API_UNAVAILABLE",
+        "MINERU_TASK_TIMEOUT",
+        "MINERU_PARSE_FAILED",
+        "DIFY_RESULT_TOO_LARGE",
+        "OUTPUT_SCHEMA_INVALID",
+        "QUALITY_GATE_FAILED",
+        "MANUAL_REVIEW_REQUIRED",
+        "LOCAL_EXISTING_PROCESS_FAILED",
+        "LOCAL_EXISTING_CHECK_FAILED"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "const": "succeeded"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "candidate": {
+            "type": "object"
+          },
+          "failure": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "const": "failed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "candidate": {
+            "type": "null"
+          },
+          "failure": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "const": "needs_review"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "failure": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "failure"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "selected_mode"
+        ],
+        "properties": {
+          "selected_mode": {
+            "const": "local-existing"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "backend": {
+            "properties": {
+              "name": {
+                "const": "local-existing"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "selected_mode"
+        ],
+        "properties": {
+          "selected_mode": {
+            "const": "dify-experimental"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "backend": {
+            "properties": {
+              "name": {
+                "const": "dify-mineru-api"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

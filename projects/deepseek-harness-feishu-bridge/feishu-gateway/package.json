@@ -1,0 +1,14 @@
+{
+  "name": "local-ai-feishu-gateway",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "node src/gateway.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "1.73.3"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,25 @@
+{
+  "schema": "s6-authorization/v2",
+  "enabled": false,
+  "user_confirmed": false,
+  "authorization_reference": null,
+  "run_id": "s6-unapproved-example",
+  "app_id": null,
+  "chat_id": null,
+  "account_id": null,
+  "confirmed_at": null,
+  "expires_at": null,
+  "secret_path": null,
+  "isolation": {"strategy": null, "confirmed": false, "evidence": null},
+  "sources": [],
+  "fixtures": [
+    {"filename": "kb-v21-s6-normal-test.txt", "synthetic": true, "size_bytes": 119, "sha256": "de211d39de310366cbef3f2b67a7dd8de87c0362031f45939d515cbd2cea7470", "md5": "21cc177e0f2b359e9ae8368ce4d06d8c"},
+    {"filename": "kb-v21-s6-recovery-test.txt", "synthetic": true, "size_bytes": 121, "sha256": "b0dfffd19629190773a2b58192328fb053e01de74e7d0ca8c1989218a4da3eb5", "md5": "8b6c1790377fe538b06c223cfe5c3e32"}
+  ],
+  "permitted_operations": [],
+  "discovery_max_seconds": 600,
+  "discovery_page_size": 20,
+  "limits": {"send": 4, "download": 2, "read": 8, "auth": 2},
+  "total_requests": 16,
+  "logical_notifications": 2
+}

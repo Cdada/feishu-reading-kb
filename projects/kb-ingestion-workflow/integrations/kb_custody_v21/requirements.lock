@@ -1,0 +1,8 @@
+# Offline test/runtime dependencies; install before starting guarded tests.
+markdown-it-py==3.0.0
+mdurl==0.1.2
+Pillow==12.3.0
+reportlab==4.4.9
+charset-normalizer==3.4.4
+pypdf==6.10.0
+PyYAML==6.0.3

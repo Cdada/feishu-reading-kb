@@ -1,0 +1,84 @@
+.DS_Store
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+!*.env.example
+*.pem
+*.key
+*.crt
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dist/
+build/
+.next/
+.nuxt/
+
+# Logs and temporary outputs
+*.log
+*.tmp
+*.temp
+tmp/
+cache/
+.cache/
+
+# Data and generated artifacts
+outputs/
+generated/
+raw_downloads/
+*.sqlite
+*.sqlite3
+*.db
+
+# Large binary intermediates
+*.zip
+*.tar
+*.tar.gz
+*.7z
+*.dmg
+
+# macOS / editor
+.idea/
+.vscode/
+
+# Local development evidence, private configuration and backup references
+.dev-runtime/
+.worktrees/
+*.local.json
+*.local.md
+*.local.txt
+*.local.patch
+*.local.zip
+*.local.tar.gz
+*.sqlite3-*
+*.sqlite-*
+*.db-*
+credentials/
+secrets/
+backups/
+
+# Personal material and local configuration are never public source
+*.local.*
+*.pdf
+*.epub
+*.docx
+*.webarchive
+*.pages
+*.pptx
+reading-library/
+local-state/

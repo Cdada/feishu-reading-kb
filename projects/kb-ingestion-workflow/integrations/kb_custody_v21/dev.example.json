@@ -1,0 +1,12 @@
+{
+  "mode": "dev",
+  "branch": "codex/kb-ingestion-v2.1",
+  "runtime_relative": ".dev-runtime/kb-v21",
+  "sender": "persistent_mock",
+  "real_feishu_sending": false,
+  "baidu_enabled": false,
+  "destructive_cleanup": false,
+  "listen": false,
+  "reserved_port": 18791,
+  "max_asset_bytes": 67108864
+}

@@ -1,0 +1,12 @@
+{
+  "schema": "2.0",
+  "config": {"enable_forward_interaction": false, "streaming_mode": false, "width_mode": "default"},
+  "header": {"template": "blue", "title": {"tag": "plain_text", "content": "确认导读入库"}},
+  "body": {"direction": "vertical", "elements": [
+    {"element_id": "_2", "tag": "div", "text": {"tag": "plain_text", "content": "合成资料", "text_align": "left"}, "width": "fill"},
+    {"element_id": "_4", "tag": "div", "text": {"tag": "plain_text", "content": "导读第 1 版。请先查看本卡片所回复的导读 PDF，再选择。", "text_align": "left"}, "width": "fill"},
+    {"element_id": "_6", "tag": "button", "text": {"tag": "plain_text", "content": "确认入库"}, "type": "primary_filled", "width": "fill"},
+    {"element_id": "_8", "tag": "button", "text": {"tag": "plain_text", "content": "补充材料后再入库"}, "type": "default", "width": "fill"},
+    {"element_id": "_10", "tag": "button", "text": {"tag": "plain_text", "content": "暂不入库"}, "type": "default", "width": "fill"}
+  ]}
+}

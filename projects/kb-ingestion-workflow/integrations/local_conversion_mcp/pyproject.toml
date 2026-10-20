@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "local-document-conversion-mcp"
+version = "0.1.0"
+license = {text = "MIT"}
+authors = [{name = "dadaism-Cx"}]
+description = "Private local MCP facade for the knowledge-base conversion workflow"
+requires-python = ">=3.12"
+dependencies = [
+  "mcp[cli]>=2,<3",
+]
+
+[project.scripts]
+local-document-conversion-mcp = "local_document_conversion_mcp.server:main"
+local-document-conversion-worker = "local_document_conversion_mcp.worker:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/local_document_conversion_mcp"]
