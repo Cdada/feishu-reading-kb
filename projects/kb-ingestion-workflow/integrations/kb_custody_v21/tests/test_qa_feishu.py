@@ -2,6 +2,7 @@
 import json
 from types import SimpleNamespace
 import unittest
+from unittest.mock import Mock, patch
 
 from kb_custody_v21.contracts import stable_key, ContractError
 from kb_custody_v21.daily_cards import CardStore, render_card, REFERENCE
@@ -47,6 +48,25 @@ class QAFeishuTests(unittest.TestCase):
         self.assertEqual(len(self.f.f.transport.calls),count)
         job=self.flow.store.get(stable_key('qa-message','om_qa'))
         self.assertEqual(job['state'],'sent');self.assertIn('查文献',job['result']['text'])
+
+    def test_evidence_callback_resumes_without_recreating_saved_result(self):
+        self.observe(self.message('问库：帮助'));self.flow.collect()
+        self.flow.step();self.flow.report()
+        job=self.flow.store.get(stable_key('qa-message','om_qa'))
+        card=dict(card_id='c'*64,state='sent',binding=dict(job_id=job['id']))
+        cards=Mock()
+        cards.prepare.return_value=card
+        cards.choice.return_value=dict(command='查看原文依据',result=None,evidence=dict(receipts={}))
+        cards.get.return_value=card
+        self.b.card_listener=SimpleNamespace(ready=True)
+        self.b.card_flow=SimpleNamespace(cards=cards,delivery=Mock())
+        with patch.object(self.flow.store,'enqueue',return_value=dict(state='ready')), \
+                patch.object(self.flow.store,'complete') as complete, \
+                patch.object(self.flow.model,'saved') as saved:
+            self.flow.report()
+        complete.assert_not_called();saved.assert_not_called()
+        cards.finish.assert_called_once()
+        self.b.card_flow.delivery.update.assert_called_once()
 
     def test_qa_card_accepts_only_fixed_owner_command(self):
         cards=CardStore(self.daily)

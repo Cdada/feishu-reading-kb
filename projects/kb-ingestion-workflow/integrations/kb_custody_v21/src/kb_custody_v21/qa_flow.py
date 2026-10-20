@@ -142,8 +142,8 @@ class QAFlow:
                     if created['state']=='queued':
                         self.sources.verify(job['result']['hits'])
                         output = self.model.saved(job)
-                    detail = render_evidence(output, job['result']['hits']) if output is not None else render_search(job['result']['hits'])
-                    self.store.complete(key, dict(status='retrieval', text=detail, hits=job['result']['hits']))
+                        detail = render_evidence(output, job['result']['hits']) if output is not None else render_search(job['result']['hits'])
+                        self.store.complete(key, dict(status='retrieval', text=detail, hits=job['result']['hits']))
                 else:
                     self.store.enqueue(key, job['message_id'], command, dict(receipts=choice['evidence']['receipts']), conversation=job['conversation'])
                 b.card_flow.cards.finish(card['card_id'], dict(status='accepted'), checked_access=b.check_authorization)
