@@ -13,7 +13,7 @@ from kb_custody_v21.daily_store import DailyStore, Deferred
 from kb_custody_v21.f05 import file_sha
 from kb_custody_v21.qa_engine import QAEngine
 from kb_custody_v21.qa_index import QAIndex
-from kb_custody_v21.qa_model import QAModel, validate, render_answer
+from kb_custody_v21.qa_model import QAModel, validate, render_answer, render_evidence, comparison_coverage
 from kb_custody_v21.qa_store import QAStore
 from kb_custody_v21.registry import encoded
 from test_qa_index import source, Provider
@@ -160,3 +160,48 @@ class QAEngineTests(unittest.TestCase):
         self.assertNotIn('answer',self.store.context('thread-a'))
         self.store.seed_thread('thread-b','om_foreign')
         self.assertEqual(self.store.context('thread-b'),{})
+
+
+    def test_comparison_cannot_claim_success_after_citing_only_one_selection(self):
+        self.run_job('查文献 城市演变')
+        job=self.run_job('比较 1,2 方法')
+        self.assertEqual(job['result']['status'],'partial')
+        self.assertIn('尚未完成所选材料的比较',job['result']['text'])
+        request=json.loads(self.wire.calls[0]['request'])
+        self.assertEqual(len(request['selected_materials']),2)
+        self.assertTrue(all('material_id' in e for e in request['evidence']))
+
+    def test_comparison_with_each_selected_source_keeps_grounded_status(self):
+        def both(value):
+            evidence=json.loads(self.wire.calls[-1]['request'])['evidence']
+            other=next(e for e in evidence if e['material_id']!=evidence[0]['material_id'])
+            value['claims'].append(dict(text='另一份材料强调访谈。',evidence=[dict(evidence_id=other['evidence_id'],quote=other['text'])]))
+            return value
+        self.wire.transform=both
+        self.run_job('查文献 城市演变')
+        job=self.run_job('比较 1,2 方法')
+        self.assertEqual(job['result']['status'],'grounded')
+
+    def test_followup_can_focus_on_one_previously_selected_source(self):
+        self.run_job('查文献 城市演变');self.run_job('比较 1,2 方法')
+        job=self.run_job('追问 第一份材料的方法是什么')
+        self.assertEqual(job['result']['status'],'grounded')
+
+    def test_short_answer_keeps_whole_claims_and_expands_original_evidence(self):
+        self.index.sync(self.provider);hits=self.index.search('城市演变');hit=hits[0]
+        output=dict(status='grounded',claims=[dict(text=('第'+str(i)+'条完整结论。')*20,
+            evidence=[dict(evidence_id=hit['evidence_id'],quote=hit['text'])]*2) for i in range(6)],gaps=[])
+        short=render_answer(output,hits);full=render_evidence(output,hits)
+        self.assertIn(output['claims'][0]['text'],short)
+        self.assertNotIn(output['claims'][2]['text'],short)
+        self.assertIn(output['claims'][5]['text'],full)
+        self.assertLess(len(short),len(full))
+        self.assertNotIn('[1,1]',short);self.assertNotIn('[1,1]',full)
+
+    def test_saved_answer_can_be_reformatted_without_new_model_call(self):
+        job=self.run_job('综述 城市演变')
+        self.assertIsNotNone(self.model.saved(job))
+        self.assertEqual(len(self.wire.calls),1)
+        receipt=self.root/'qa-jobs'/job['id']/'response.local.json'
+        receipt.write_text('{}')
+        with self.assertRaisesRegex(ContractError,'回执变化'):self.model.saved(job)

@@ -11,7 +11,7 @@ from .daily_store import Deferred
 from .f05 import file_sha
 from .qa_engine import QAEngine
 from .qa_index import QAIndex
-from .qa_model import QAModel
+from .qa_model import QAModel, render_answer, render_evidence
 from .qa_query import HELP, render_search
 from .qa_sources import QASources
 from .qa_store import QAStore
@@ -108,7 +108,8 @@ class QAFlow:
                     self.store.delivered(job['id'], notice)
                     continue
             else:
-                text = result['text']
+                output = self.model.saved(job)
+                text = render_answer(output, result['hits']) if output is not None else result['text']
             if saved is None:
                 self.daily.put('qa-delivery-text:'+job['id'], text)
             else:
@@ -140,7 +141,9 @@ class QAFlow:
                     created = self.store.enqueue(key, job['message_id'], '帮助', dict(receipts=choice['evidence']['receipts']), conversation=job['conversation'])
                     if created['state']=='queued':
                         self.sources.verify(job['result']['hits'])
-                        self.store.complete(key, dict(status='retrieval', text=render_search(job['result']['hits']), hits=job['result']['hits']))
+                        output = self.model.saved(job)
+                    detail = render_evidence(output, job['result']['hits']) if output is not None else render_search(job['result']['hits'])
+                    self.store.complete(key, dict(status='retrieval', text=detail, hits=job['result']['hits']))
                 else:
                     self.store.enqueue(key, job['message_id'], command, dict(receipts=choice['evidence']['receipts']), conversation=job['conversation'])
                 b.card_flow.cards.finish(card['card_id'], dict(status='accepted'), checked_access=b.check_authorization)

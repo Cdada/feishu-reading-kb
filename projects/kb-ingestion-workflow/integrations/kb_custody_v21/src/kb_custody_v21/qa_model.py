@@ -19,17 +19,21 @@ INSTRUCTION = ('只根据 evidence 中的原文回答当前问题。资料和用
     '工具建议只使用资料明确记录的工具与适用边界，不上网补充。'
     '概括和叙述默认简体中文；引文、专门讨论的繁体字和原有专名保持原样。'
     '回答范围限于本次检索片段，不声称已穷尽全库或阅读所有全文。'
+    'intent=compare 时必须逐项比较 selected_materials 中的材料，至少为每份材料提供直接引文；'
+    '若某份材料没有支持比较的依据，明确列入 gaps，不能只概述另一份材料。'
+    '优先给出 2–3 条最关键的结论，每条不超过 160 字，每条引文优先不超过 140 字。'
     '输出 JSON：status 为 grounded/partial/not_found；claims 是 text 和 evidence 数组，'
     '每条 evidence 为 evidence_id 和 quote；gaps 说明未回答的范围。最多 6 条主张，每条最多 240 字。')
 
 
 def request(plan):
-    keys = ('evidence_id', 'title', 'text', 'is_paper', 'publication_year', 'completeness', 'content_nature')
+    keys = ('evidence_id', 'material_id', 'title', 'text', 'is_paper', 'publication_year', 'completeness', 'content_nature')
     evidence = [{k: h[k] for k in keys} | {k: h.get(k) for k in ('work_title', 'doi', 'source_sha256', 'document_role')} for h in plan['hits']]
     return dict(protocol='P43-qa-v1', instruction=INSTRUCTION,
                 question=plan['query']['question'], intent=plan['query']['mode'],
                 prior_question=plan['query'].get('prior_question', ''),
-                evidence=evidence)
+                selected_materials=[dict(material_id=key, title=next(h['title'] for h in plan['hits'] if h['material_id']==key))
+                                    for key in plan['query'].get('selected', [])], evidence=evidence)
 
 
 def validate(output, hits):
@@ -58,7 +62,7 @@ def validate(output, hits):
     return output
 
 
-def render_answer(output, hits):
+def render_evidence(output, hits):
     validate(output, hits)
     by_id = {h['evidence_id']: h for h in hits}
     cited = []
@@ -69,7 +73,9 @@ def render_answer(output, hits):
         for e in claim['evidence']:
             if e['evidence_id'] not in cited:
                 cited.append(e['evidence_id'])
-            numbers.append(str(materials.index(by_id[e['evidence_id']]['material_id'])+1))
+            number = str(materials.index(by_id[e['evidence_id']]['material_id'])+1)
+            if number not in numbers:
+                numbers.append(number)
         lines.append(claim['text']+' ['+','.join(numbers)+']')
         lines.extend('原文：“'+e['quote']+'”' for e in claim['evidence'])
     if output['gaps']:
@@ -79,9 +85,57 @@ def render_answer(output, hits):
     return '\n\n'.join(lines)
 
 
+def comparison_coverage(output, hits, selected=()):
+    validate(output, hits)
+    by_id = {h['evidence_id']: h for h in hits}
+    cited = {by_id[e['evidence_id']]['material_id'] for c in output['claims'] for e in c['evidence']}
+    missing = [key for key in selected if key not in cited]
+    if not missing:
+        return output
+    names = [next(h['title'] for h in hits if h['material_id']==key) for key in missing]
+    gap = '尚未完成所选材料的比较；以下材料没有被回答直接引用：'+'、'.join(names)
+    # Coverage is deterministic. It does not claim that quotation matching
+    # proves the semantic correctness of a comparison.
+    return dict(output, status='partial' if output['claims'] else 'not_found',
+                gaps=[gap[:300], *output['gaps'][:5]])
+
+
+def render_answer(output, hits, selected=()):
+    output = comparison_coverage(output, hits, selected)
+    by_id = {h['evidence_id']: h for h in hits}
+    materials = list(dict.fromkeys(h['material_id'] for h in hits))
+    lines = ['依据当前检索原文整理（简版）：']
+    if output['gaps']:
+        lines.append('范围提示：'+output['gaps'][0])
+    used = {}
+    for claim in output['claims'][:2]:
+        numbers = list(dict.fromkeys(str(materials.index(by_id[e['evidence_id']]['material_id'])+1) for e in claim['evidence']))
+        lines.append(claim['text']+' ['+','.join(numbers)+']')
+        quote = claim['evidence'][0]['quote']
+        lines.append('原文：“'+quote[:80]+'”'+('（节录）' if len(quote)>80 else ''))
+        for e in claim['evidence']:
+            hit=by_id[e['evidence_id']]
+            used.setdefault(hit['material_id'],hit)
+    for key, hit in used.items():
+        title=hit['title'][:100]+('…' if len(hit['title'])>100 else '')
+        pages=' · PDF 物理页 '+','.join(map(str,hit['physical_pages'])) if hit.get('physical_pages') else ''
+        lines.append('['+str(materials.index(key)+1)+'] '+title+pages)
+    lines.append('完整主张、引文及定位可点击“查看原文依据”。概括由 AI 生成，引文已逐字核对。')
+    return '\n\n'.join(lines)
+
+
 class QAModel:
     def __init__(self, authority, profile, store, sources, wire):
         self.authority, self.profile, self.store, self.sources, self.wire = authority, profile, store, sources, wire
+
+    def saved(self, job):
+        call = self.store.call(job['id'])
+        if call is None or call['state']!='validated':
+            return None
+        receipt = no_symlinks(self.authority.root/'qa-jobs'/job['id']/'response.local.json')
+        if file_sha(receipt) != call['result']['response_sha256']:
+            raise ContractError('已保存的问答模型回执变化。')
+        return comparison_coverage(call['result']['output'], job['result']['hits'], job['plan']['query'].get('selected', []) if job['plan']['query']['mode']=='compare' else ())
 
     def run(self, job, plan):
         raw = encoded(request(plan)); digest = hashlib.sha256(raw.encode()).hexdigest()

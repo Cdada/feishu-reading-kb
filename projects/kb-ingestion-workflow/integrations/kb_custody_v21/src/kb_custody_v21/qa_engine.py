@@ -3,7 +3,7 @@ import re
 
 from .contracts import ContractError
 from .daily_store import Deferred
-from .qa_model import render_answer
+from .qa_model import comparison_coverage, render_answer
 from .qa_query import HELP, parse, render_search, render_weekly
 
 
@@ -51,9 +51,13 @@ class QAEngine:
                 text = reason+'。以下保留原文检索结果，未生成综合回答。\n\n'+render_search(hits)
                 status = error.reason
             else:
+                output = comparison_coverage(output, hits, selected if query['mode']=='compare' else ())
                 text, status = render_answer(output, hits), output['status']
         self.sources.verify(hits)
         materials = list(dict.fromkeys(h['material_id'] for h in hits))[:8]
-        new_context = dict(question=context.get('question', query['question']) if query['mode']=='followup' else query['question'],
+        topic = context.get('question', query['question']) if query['mode']=='followup' else query['question']
+        if query['mode']=='compare':
+            topic = (context.get('question', '')+' '+query['question']).strip()[:2000]
+        new_context = dict(question=topic,
                            selected=selected, materials=materials, year_from=query.get('year_from'), year_to=query.get('year_to'))
         self.store.complete(job['id'], dict(status=status, text=text, hits=hits), new_context)
