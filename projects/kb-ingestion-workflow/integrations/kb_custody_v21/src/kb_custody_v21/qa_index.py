@@ -1,0 +1,160 @@
+"""Rebuildable SQLite FTS5 index with bounded Chinese bigrams and exact offsets.
+
+No embedding process, extra tokenizer service or writes to source documents.
+Chinese bigrams retain two-character terms; Latin words remain whole tokens.
+"""
+from contextlib import contextmanager
+import hashlib
+import json
+import re
+import sqlite3
+import unicodedata
+
+from .contracts import ContractError
+from .registry import encoded
+from .runtime import no_symlinks
+
+SCHEMA = '''
+CREATE TABLE IF NOT EXISTS qa_index_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS qa_sources(id TEXT PRIMARY KEY,digest TEXT NOT NULL,metadata TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS qa_chunks(id INTEGER PRIMARY KEY,material_id TEXT NOT NULL,
+ start INTEGER NOT NULL,end INTEGER NOT NULL,paragraph INTEGER NOT NULL,heading TEXT NOT NULL,text TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS qa_chunks_source ON qa_chunks(material_id);
+CREATE VIRTUAL TABLE IF NOT EXISTS qa_fts USING fts5(title,keywords,body,tokenize='unicode61');
+'''
+VERSION = 'qa-bigram-v1'
+
+
+def tokens(text):
+    result = []
+    for word in re.findall(r'[\u3400-\u9fff]+|[a-z0-9]+(?:[._+-][a-z0-9]+)*', unicodedata.normalize('NFKC', text).lower()):
+        if '\u3400' <= word[0] <= '\u9fff':
+            result.extend(word[i:i+2] for i in range(max(1, len(word)-1)))
+        else:
+            result.append(word)
+    return list(dict.fromkeys(result))
+
+
+def chunks(source):
+    text, heading = source['text'], ''
+    # Paragraphs stay in source coordinates even when a repeated header is
+    # removed. Never concatenate across an excluded range into a quotation.
+    for number, match in enumerate(re.finditer(r'\S[^\n]*(?:\n(?!\s*\n)[^\n]+)*', text), 1):
+        if match.group().startswith('#'):
+            heading = match.group().splitlines()[0].lstrip('# ').strip()[:160]
+        intervals = [(match.start(), match.end())]
+        for r in source['excluded_ranges']:
+            intervals = [(x, y) for a, z in intervals for x, y in
+                         ((a, min(z, r['char_start'])), (max(a, r['char_end']), z)) if x < y]
+        for a, z in intervals:
+            while a < z:
+                end = min(a+900, z)
+                if text[a:end].strip():
+                    yield a, end, number, heading, text[a:end]
+                a = end
+
+
+class QAIndex:
+    def __init__(self, path):
+        self.path = no_symlinks(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        with self.connection() as db:
+            db.executescript(SCHEMA)
+            old = db.execute("SELECT value FROM qa_index_meta WHERE key='version'").fetchone()
+            if old and old[0] != VERSION:
+                raise ContractError('问答索引版本变化，需要显式重建。')
+            db.execute("INSERT OR IGNORE INTO qa_index_meta VALUES ('version',?)", (VERSION,))
+
+    @contextmanager
+    def connection(self):
+        no_symlinks(self.path)
+        db = sqlite3.connect(self.path, timeout=10)
+        db.row_factory = sqlite3.Row
+        try:
+            db.execute('PRAGMA journal_mode=WAL')
+            with db:
+                yield db
+        finally:
+            db.close()
+
+    @staticmethod
+    def remove(db, key):
+        db.execute('DELETE FROM qa_fts WHERE rowid IN (SELECT id FROM qa_chunks WHERE material_id=?)', (key,))
+        db.execute('DELETE FROM qa_chunks WHERE material_id=?', (key,))
+        db.execute('DELETE FROM qa_sources WHERE id=?', (key,))
+
+    def sync(self, provider):
+        ids = provider.ids()
+        changed = removed = 0
+        with self.connection() as db:
+            old = {r['id']: r['digest'] for r in db.execute('SELECT id,digest FROM qa_sources')}
+            for key in old.keys()-set(ids):
+                self.remove(db, key); removed += 1
+        # Each material commits independently. A query only runs after a full
+        # successful sync, so an invalid source cannot leave stale usable hits.
+        for key in ids:
+            source = provider.get(key)
+            metadata = {k: v for k, v in source.items() if k not in ('text', 'evidence')}
+            digest = hashlib.sha256(encoded(metadata).encode()).hexdigest()
+            if old.get(key) == digest:
+                continue
+            with self.connection() as db:
+                self.remove(db, key)
+                db.execute('INSERT INTO qa_sources VALUES (?,?,?)', (key, digest, encoded(metadata)))
+                for a, z, p, heading, body in chunks(source):
+                    row = db.execute('INSERT INTO qa_chunks(material_id,start,end,paragraph,heading,text) VALUES (?,?,?,?,?,?)',
+                                     (key, a, z, p, heading, body))
+                    db.execute('INSERT INTO qa_fts(rowid,title,keywords,body) VALUES (?,?,?,?)',
+                               (row.lastrowid, ' '.join(tokens(source['title'])),
+                                ' '.join(tokens(' '.join(source['keywords']))), ' '.join(tokens(body))))
+                changed += 1
+        return dict(total=len(ids), changed=changed, removed=removed)
+
+    def search(self, text, *, material_ids=(), year_from=None, year_to=None, limit=12):
+        terms = tokens(text)[:80]
+        if not terms:
+            return []
+        if not 1 <= limit <= 40 or len(material_ids) > 4:
+            raise ContractError('问答范围超过本版上限。')
+        match = ' OR '.join('"'+t.replace('"', '""')+'"' for t in terms)
+        clauses, args = ['qa_fts MATCH ?'], [match]
+        if material_ids:
+            clauses.append('c.material_id IN ('+','.join('?' for _ in material_ids)+')')
+            args.extend(material_ids)
+        for year, op in ((year_from, '>='), (year_to, '<=')):
+            if year is not None:
+                clauses.append("json_extract(s.metadata,'$.publication_year') "+op+' ?')
+                args.append(year)
+        with self.connection() as db:
+            rows = db.execute('SELECT c.*,s.metadata,bm25(qa_fts,4,2,1) AS rank FROM qa_fts '
+                'JOIN qa_chunks c ON c.id=qa_fts.rowid JOIN qa_sources s ON s.id=c.material_id WHERE '
+                +' AND '.join(clauses)+' ORDER BY rank,c.material_id,c.start LIMIT 160', args).fetchall()
+        ranked = []
+        for row in rows:
+            meta = json.loads(row['metadata'])
+            overlap = set(terms) & set(tokens(row['text']+' '+meta['title']+' '+' '.join(meta['keywords'])))
+            # Discard accidental one-bigram matches in a long natural question.
+            if len(overlap) < min(2, len(terms)):
+                continue
+            hit = dict(meta, text=row['text'], char_start=row['start'], char_end=row['end'],
+                       paragraph=row['paragraph'], heading=row['heading'], score=len(overlap)/len(terms))
+            hit['evidence_id'] = hashlib.sha256(encoded([meta['material_id'], meta['body_sha256'], row['start'], row['end']]).encode()).hexdigest()[:24]
+            ranked.append((hit, row['rank']))
+        ranked.sort(key=lambda pair: (-pair[0]['score'], pair[1], pair[0]['material_id'], pair[0]['char_start']))
+        # Round-robin source diversity: a long paper must not crowd out others.
+        buckets = {}
+        for hit, _ in ranked:
+            buckets.setdefault(hit['material_id'], []).append(hit)
+        results = []
+        while buckets and len(results) < limit:
+            for key in list(buckets):
+                results.append(buckets[key].pop(0))
+                if not buckets[key]:
+                    del buckets[key]
+                if len(results) == limit:
+                    break
+        return results
+
+    def materials(self):
+        with self.connection() as db:
+            return [json.loads(r[0]) for r in db.execute('SELECT metadata FROM qa_sources ORDER BY id')]
