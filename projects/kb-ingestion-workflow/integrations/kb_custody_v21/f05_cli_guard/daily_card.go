@@ -52,11 +52,6 @@ func cardBinding(v *dailyCard) bool {
 		details, _ := b["details"].(string)
 		return len(b) == 6 && cardSHA.MatchString(job) && len(details) > 0 && len(details) <= 12000
 	}
-	if purpose == "qa" {
-		job, _ := b["job_id"].(string)
-		details, _ := b["details"].(string)
-		return len(b) == 6 && cardSHA.MatchString(job) && len(details) > 0 && len(details) <= 12000
-	}
 	if purpose == "preview" {
 		id, _ := b["publication_id"].(string)
 		digest, _ := b["pdf_sha256"].(string)
@@ -83,10 +78,6 @@ func cardJSON(v *dailyCard) map[string]any {
 	}
 	if relationPurpose(b["purpose"]) {
 		title, detail, commands = relationCard(b)
-	}
-	if b["purpose"] == "qa" {
-		title, detail = "知识库问答", b["details"].(string)
-		commands = []string{"查看原文依据", "本周周报", "新问题"}
 	}
 	if b["purpose"] == "qa" {
 		title, detail = "知识库问答", b["details"].(string)
@@ -120,16 +111,6 @@ func dailyCardPath(c Control, p pilotSession) bool {
 	}
 	if relationPurpose(v.Binding["purpose"]) {
 		if !relationEnabled(c, p.Daily.Rules) {
-			return false
-		}
-	} else if v.Binding["purpose"] == "qa" {
-		var rules struct {
-			QA struct {
-				Reference string `json:"reference"`
-				Enabled   bool   `json:"enabled"`
-			} `json:"qa"`
-		}
-		if !frozenJSON(c, p.Daily.Rules, &rules) || rules.QA.Reference != "P43-qa-v1" || !rules.QA.Enabled {
 			return false
 		}
 	} else if v.Binding["purpose"] == "qa" {

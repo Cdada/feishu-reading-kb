@@ -15,10 +15,6 @@ func cardControl(t *testing.T, mode string) Control {
 }
 
 func cardControlTarget(t *testing.T, mode, targetType string) Control {
-	return cardControlTarget(t, mode, "file")
-}
-
-func cardControlTarget(t *testing.T, mode, targetType string) Control {
 	old := pilotList(dailyControl(t))
 	rebindDaily(t, &old)
 	g := guard(t, old)

@@ -42,6 +42,10 @@ def main():
                   "exit_code": result.returncode, "command": command}
         records.append(record)
         print(f"{name}: exit {result.returncode}", flush=True)
+        if result.returncode:
+            # Surface bounded synthetic diagnostics even when compilation fails
+            # before tests can produce individual results.
+            print((result.stdout + result.stderr)[-12000:], flush=True)
 
     # Dependencies are fetched separately before the offline suite. Serial Go
     # compilation bounds concurrent compiler work; GOMEMLIMIT is a soft target.
