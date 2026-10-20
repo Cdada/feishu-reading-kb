@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 import json
 import sqlite3
 from pathlib import Path
@@ -124,10 +126,16 @@ class Ledger:
             """
         )
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         db = sqlite3.connect(self.path, timeout=10)
-        db.row_factory = sqlite3.Row
-        return db
+        try:
+            db.row_factory = sqlite3.Row
+            # The SQLite context commits or rolls back; it does not close.
+            with db:
+                yield db
+        finally:
+            db.close()
 
     def find_documents(self, *, normalized_filename: str, sha256: str) -> list[dict[str, Any]]:
         with self._connect() as db:
