@@ -101,3 +101,29 @@ PYTHONPATH=projects/kb-ingestion-workflow/integrations/kb_custody_v21/src:projec
 默认60/20/20是目标比例。只有一个相互关联的大组时，不会强拆成三个集合制造独立性；报告实际数量、无候选证据题和未核定金标准题。候选检索来源也可能误连成大组，因此这一步只是分组提案，正式冻结前应先核准实际证据及派生关系。近重复但未登记同源关系的材料仍可能泄漏，需要额外复核。
 
 这个模块不执行问答、不评分，也不会把 `gold_status=reviewed` 标签当作它已经验证过事实。语义评测前仍需独立核对证据、必答点和禁止结论；已用于修复的保留题应转入回归范围，并补充新的保留题。
+
+
+## Freeze the evidence supplied to a question
+
+`qa_test_fixtures.compile_fixture` produces two separate objects: `model_input`
+(question, explicit constraints, conversation and authorized source spans) and
+`expected` (private reference criteria). Reference claims never enter the model
+input. The caller supplies loaded source records; this function does not open
+files, grant access, retrieve documents or run a model.
+
+Each source span is bound to the complete source body's SHA-256. A changed
+source requires review. Input, rubric and complete fixture have separate hashes,
+so a rubric edit can be distinguished from an evidence change. Context character
+counts are reported for later budgeting; no silent truncation is performed.
+
+Answerability is explicitly relative to the supplied evidence. A partial answer
+in this test does not mean that the complete knowledge base lacks the answer.
+Use a separate retrieval/coverage audit for that claim. Run fixed-context tests
+to compare answer instructions, then end-to-end tests to assess the combined
+retrieval and answer system. Correctly handling missing evidence is scored
+separately from actually resolving the user's business question.
+
+Treat document text as untrusted evidence, including embedded instructions.
+Permission tests use synthetic inaccessible documents; do not load private
+forbidden content into the candidate model merely to test whether it reveals it.
+Fixture validation checks identities, hashes and spans, not semantic quality.
