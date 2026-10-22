@@ -11,10 +11,10 @@ from .daily_store import Deferred
 from .f05 import file_sha
 from .qa_engine import QAEngine
 from .qa_index import QAIndex
-from .qa_model import QAModel, render_answer, render_evidence, render_plan_answer
-from . import qa_weekly
+from .qa_model import QAModel, render_evidence, render_plan_answer
+from . import qa_weekly, qa_original
 from .qa_query import HELP, render_search
-from .qa_time import CHOICES, describe
+from .qa_time import CHOICES
 from .qa_sources import QASources
 from .qa_store import QAStore
 from .registry import encoded
@@ -114,6 +114,16 @@ class QAFlow:
             else:
                 output = self.model.saved(job)
                 text = render_plan_answer(output,job['plan']) if output is not None else result['text']
+                if result['status']=='original' and result['hits']:
+                    try:
+                        text=qa_original.render(b,self.sources,job)
+                    except (ContractError,FileNotFoundError,MaterialProblem) as error:
+                        self.daily.put('qa-original-error:'+job['id'],dict(type=type(error).__name__,detail=str(error)))
+                        text='本次原件入口未通过核验或读取未完成，未提供链接。可以重新查文献，或请 Codex 核查本地原件。'
+                        if saved is not None:
+                            notice=b.notice('qa-original-invalidated:'+job['id'],text,purpose='service')
+                            self.store.delivered(job['id'],notice)
+                            continue
             if saved is None:
                 self.daily.put('qa-delivery-text:'+job['id'], text)
             else:
@@ -133,7 +143,7 @@ class QAFlow:
             binding = dict(purpose='qa', document_id=job['message_id'], source_sha256=hashlib.sha256(job['text'].encode()).hexdigest(),
                 target_message_id=job['delivery']['message_id'], job_id=job['id'],
                 details='可以继续发送“问库：追问 …”。以下选项仅作用于这次问答，不会把回答写入知识库。')
-            if job['result'].get('menu') in ('time','weekly'):
+            if job['result'].get('menu') in ('time','weekly','result'):
                 binding['menu']=job['result']['menu']
             card = b.card_flow.cards.prepare(binding, '选择时间口径' if binding.get('menu')=='time' else '继续查询测试知识库')
             if card['state']=='prepared':
@@ -146,6 +156,8 @@ class QAFlow:
                 if command in CHOICES:
                     self.store.enqueue(key,job['message_id'],command,dict(receipts=choice['evidence']['receipts'],
                         qa_time_choice=dict(job_id=job['id'],command=command)),conversation=job['conversation'])
+                elif command=='取阅原件':
+                    self.store.enqueue(key,job['message_id'],'取阅原件',dict(receipts=choice['evidence']['receipts'],qa_original_parent=job['id']),conversation=job['conversation'])
                 elif command=='周报解读':
                     period=job['plan']['query']['weekly']['question']
                     if period.startswith('周报 '): period=period[len('周报 '):]

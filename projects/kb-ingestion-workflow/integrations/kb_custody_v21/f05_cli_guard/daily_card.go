@@ -50,7 +50,7 @@ func cardBinding(v *dailyCard) bool {
 	if purpose == "qa" {
 		job, _ := b["job_id"].(string)
 		details, _ := b["details"].(string)
-		return (len(b) == 6 && b["menu"] == nil || len(b) == 7 && (b["menu"] == "time" || b["menu"] == "weekly")) && cardSHA.MatchString(job) && len(details) > 0 && len(details) <= 12000
+		return (len(b) == 6 && b["menu"] == nil || len(b) == 7 && (b["menu"] == "time" || b["menu"] == "weekly" || b["menu"] == "result")) && cardSHA.MatchString(job) && len(details) > 0 && len(details) <= 12000
 	}
 	if purpose == "preview" {
 		id, _ := b["publication_id"].(string)
@@ -82,6 +82,9 @@ func cardJSON(v *dailyCard) map[string]any {
 	if b["purpose"] == "qa" {
 		title, detail = "知识库问答", b["details"].(string)
 		commands = []string{"查看原文依据", "本周周报", "新问题"}
+		if b["menu"] == "result" {
+			commands = []string{"查看原文依据", "取阅原件", "本周周报", "新问题"}
+		}
 		if b["menu"] == "weekly" {
 			commands = []string{"周报解读", "新问题"}
 		}

@@ -116,3 +116,19 @@ func TestQAWeeklyMenuHasExplicitSynthesisChoice(t *testing.T) {
 		t.Fatal("wrong menu")
 	}
 }
+
+func TestQAOriginalMenuDoesNotChangeLegacyCard(t *testing.T) {
+	c := qaControl(t, "read", true, "text")
+	raw, _ := json.Marshal(cardJSON(c.Card))
+	if strings.Contains(string(raw), "取阅原件") {
+		t.Fatal("legacy card changed")
+	}
+	c.Card.Binding["menu"] = "result"
+	if !cardBinding(c.Card) {
+		t.Fatal("result menu rejected")
+	}
+	raw, _ = json.Marshal(cardJSON(c.Card))
+	if !knownCardCommand("取阅原件") || !strings.Contains(string(raw), "取阅原件") {
+		t.Fatal("original choice missing")
+	}
+}

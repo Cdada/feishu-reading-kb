@@ -17,6 +17,18 @@ class QAEngine:
         context = self.store.context(job['conversation'])
         plan = job['plan']
         if plan is None:
+            original_parent=job['proof'].get('qa_original_parent')
+            if original_parent:
+                parent=self.store.get(original_parent)
+                if (not parent or parent['state']!='sent' or parent['conversation']!=job['conversation']
+                        or self.store.daily.now()-parent['created']>6*3600):
+                    raise ContractError('原件选项已过期，请重新查文献。')
+                hits=parent['result']['hits']
+                self.sources.verify(hits)
+                plan=dict(query=dict(mode='original',question='取阅原件',selected=[]),hits=hits)
+                self.store.prepare(job['id'],plan)
+                self.store.complete(job['id'],dict(status='original',text='准备原件入口。',hits=hits))
+                return
             choice = job['proof'].get('qa_time_choice')
             if choice:
                 parent = self.store.get(choice['job_id'])
@@ -37,7 +49,10 @@ class QAEngine:
                                     {} if query['mode']=='reset' else None)
                 return
             summary = self.index.sync(self.sources)
-            if query['mode'] in ('weekly','weekly_answer'):
+            if query['mode']=='original':
+                source=self.sources.get(query['selected'][0])
+                hits=self.index.search(source['title'],material_ids=query['selected'],limit=1,expand=False)
+            elif query['mode'] in ('weekly','weekly_answer'):
                 anchor=job['created']
                 parent_id=job['proof'].get('qa_weekly_parent')
                 if parent_id:
@@ -67,6 +82,9 @@ class QAEngine:
         self.sources.verify(hits)
         if 'weekly' in query:
             qa_weekly.verify(query['weekly'],self.sources)
+        if query['mode']=='original':
+            self.store.complete(job['id'],dict(status='original',text='准备原件入口。' if hits else '未找到该资料的可用原文，请重新查询。',hits=hits))
+            return
         if query['mode']=='weekly':
             self.store.complete(job['id'],dict(status='local',text=query['weekly']['text'],hits=[],menu='weekly'))
             return
@@ -103,7 +121,7 @@ class QAEngine:
             topic = (context.get('question', '')+' '+query['question']).strip()[:2000]
         new_context = dict(question=topic,
                            selected=selected, materials=materials, year_from=query.get('year_from'), year_to=query.get('year_to'),time_scope=query.get('time_scope'))
-        self.store.complete(job['id'], dict(status=status, text=text, hits=hits), None if 'weekly' in query else new_context)
+        self.store.complete(job['id'], dict(status=status, text=text, hits=hits, **({'menu':'result'} if hits else {})), None if 'weekly' in query else new_context)
 
 
     def clarify(self, job, plan, context):

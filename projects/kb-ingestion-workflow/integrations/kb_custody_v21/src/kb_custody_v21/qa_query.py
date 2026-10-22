@@ -9,7 +9,7 @@ from .contracts import ContractError
 
 HELP = ('可以发送：\n问库：查文献 城市演变\n问库：查出处 “原文中的一句话”\n'
         '问库：综述 城市演变\n问库：工具 数据整理\n问库：比较 1,2 适用条件\n'
-        '问库：追问 这一观点有什么限制\n问库：本周周报\n问库：周报解读（一次模型调用）\n问库：新问题\n'
+        '问库：原件 1（取阅最近结果中的原件）\n问库：追问 这一观点有什么限制\n问库：本周周报\n问库：周报解读（一次模型调用）\n问库：新问题\n'
         '时间筛选：发表:2010-2020、内容:2010-2020、入库:2026。仅说年份时会先询问时间口径。周报：周报 2026-01-01 至 2026-01-07。'
         '\n只查询已完成整理的测试库；资料编号沿用最近一次结果，引用原文保留原字形。')
 MODES = {'查文献':'search', '查出处':'source', '综述':'answer', '工具':'tools', '比较':'compare', '追问':'followup'}
@@ -26,6 +26,12 @@ def parse(text, context=None, *, now=None):
         return choose(context.get('pending_time', {}), text)
     if text in ('新问题', '重新开始'):
         return dict(mode='reset', question='', selected=[])
+    if text.startswith('原件'):
+        found=re.fullmatch(r'原件\s+([1-8])',text)
+        ids=context.get('materials',[])
+        if not found or int(found[1])>len(ids):
+            raise ContractError('请先查文献，再发送“问库：原件 1”，编号对应最近结果。')
+        return dict(mode='original',question=text,selected=[ids[int(found[1])-1]])
     if text.startswith('周报解读'):
         period=text[len('周报解读'):].strip()
         period='周报 '+period if period[:1].isdigit() else period or '本周周报'
