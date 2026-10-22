@@ -22,7 +22,7 @@ export function qaClientOptions(args) {
 
 export async function runQA(packet, options) {
   const request = JSON.parse(packet.request);
-  if (request.protocol !== 'P43-qa-v1' || !['answer', 'compare', 'followup', 'tools'].includes(request.intent)
+  if (request.protocol !== 'P43-qa-v1' || !['answer', 'compare', 'followup', 'tools', 'weekly_answer'].includes(request.intent)
       || !Array.isArray(request.evidence) || request.evidence.length < 1 || request.evidence.length > 12) {
     throw new Error('invalid QA evidence request');
   }

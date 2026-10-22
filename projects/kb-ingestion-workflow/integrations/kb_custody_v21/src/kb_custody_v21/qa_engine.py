@@ -4,7 +4,8 @@ import re
 from .contracts import ContractError
 from .daily_store import Deferred
 from .qa_time import choose, describe, prompt as time_prompt
-from .qa_model import comparison_coverage, render_answer
+from .qa_model import comparison_coverage, render_answer, render_plan_answer
+from . import qa_weekly
 from .qa_query import HELP, parse, render_search, render_weekly
 
 
@@ -36,12 +37,23 @@ class QAEngine:
                                     {} if query['mode']=='reset' else None)
                 return
             summary = self.index.sync(self.sources)
-            if query['mode']=='weekly':
-                text = render_weekly(self.index.materials(), query['question'], job['created'])
-                self.store.complete(job['id'], dict(status='local', text=text, hits=[]))
-                return
-            hits = self.index.search(query.get('query', query['question']), material_ids=query['selected'],
-                                     year_from=query.get('year_from'), year_to=query.get('year_to'), time_scope=query.get('time_scope'))
+            if query['mode'] in ('weekly','weekly_answer'):
+                anchor=job['created']
+                parent_id=job['proof'].get('qa_weekly_parent')
+                if parent_id:
+                    parent=self.store.get(parent_id)
+                    if (not parent or parent['state']!='sent' or not parent['plan']
+                            or parent['conversation']!=job['conversation']
+                            or self.store.daily.now()-parent['created']>6*3600
+                            or 'weekly' not in parent['plan']['query']):
+                        raise ContractError('周报选项已过期，请重新提问。')
+                    snapshot=parent['plan']['query']['weekly']
+                    query['question'],anchor=snapshot['question'],snapshot['at']
+                query['weekly']=qa_weekly.plan(self.index.materials(),query['question'],anchor)
+                hits=qa_weekly.evidence(query['weekly'],self.index) if query['mode']=='weekly_answer' else []
+            else:
+                hits = self.index.search(query.get('query', query['question']), material_ids=query['selected'],
+                                         year_from=query.get('year_from'), year_to=query.get('year_to'), time_scope=query.get('time_scope'))
             if query['mode']=='source':
                 quote = re.search(r'[“「"](.+)[”」"]', query['question'])
                 if quote:
@@ -53,6 +65,11 @@ class QAEngine:
             return
         query, hits = plan['query'], plan['hits']
         self.sources.verify(hits)
+        if 'weekly' in query:
+            qa_weekly.verify(query['weekly'],self.sources)
+        if query['mode']=='weekly':
+            self.store.complete(job['id'],dict(status='local',text=query['weekly']['text'],hits=[],menu='weekly'))
+            return
         selected = query['selected']
         if selected and not set(selected) <= {h['material_id'] for h in hits}:
             text = '所选资料中有材料未找到相关原文，暂不生成比较结论。请换用关键词或重新查文献。\n\n'+render_search(hits)
@@ -70,8 +87,15 @@ class QAEngine:
                 status = error.reason
             else:
                 output = comparison_coverage(output, hits, selected if query['mode']=='compare' else ())
-                text, status = render_answer(output, hits, selected if query['mode']=='compare' else ()), output['status']
-        text=describe(text,query)
+                text, status = render_plan_answer(output, plan), output['status']
+        if query['mode']=='weekly_answer' and status not in ('grounded','partial','not_found'):
+            text=query['weekly']['text']+'\n\n'+qa_weekly.scope(query['weekly'],hits)+'\n\n'+text
+        if query['mode']=='weekly_answer' and not hits:
+            text=query['weekly']['text']+'\n\n没有可用于观点整理的原文，本次未调用模型。'
+        if status not in ('grounded','partial','not_found'):
+            text=describe(text,query)
+        if 'weekly' in query:
+            qa_weekly.verify(query['weekly'],self.sources)
         self.sources.verify(hits)
         materials = list(dict.fromkeys(h['material_id'] for h in hits))[:8]
         topic = context.get('question', query['question']) if query['mode']=='followup' else query['question']
@@ -79,7 +103,7 @@ class QAEngine:
             topic = (context.get('question', '')+' '+query['question']).strip()[:2000]
         new_context = dict(question=topic,
                            selected=selected, materials=materials, year_from=query.get('year_from'), year_to=query.get('year_to'),time_scope=query.get('time_scope'))
-        self.store.complete(job['id'], dict(status=status, text=text, hits=hits), new_context)
+        self.store.complete(job['id'], dict(status=status, text=text, hits=hits), None if 'weekly' in query else new_context)
 
 
     def clarify(self, job, plan, context):

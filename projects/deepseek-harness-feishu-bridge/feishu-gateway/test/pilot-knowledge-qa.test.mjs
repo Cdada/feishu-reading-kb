@@ -41,3 +41,14 @@ test('tool use from a QA model is rejected',async()=>{
   const f=fixture();f.client.prompt=async()=>({text:'{}',toolCalls:[{name:'shell'}]});
   assert.equal((await runQA(f.packet,{client:f.client,check:async()=>{}})).status,'received_rejected');
 });
+
+test('weekly synthesis retains one subscription turn and evidence ceiling',async()=>{
+  const f=fixture('weekly_answer');
+  assert.equal((await runQA(f.packet,{client:f.client,check:async()=>{}})).status,'received');
+  assert.equal(f.calls.length,1);
+  const g=fixture('weekly_answer');
+  const r=JSON.parse(g.packet.request);r.evidence=Array.from({length:13},()=>({text:'合成原文'}));
+  g.packet.request=JSON.stringify(r);g.packet.binding.requestSha=sha(g.packet.request);
+  await assert.rejects(runQA(g.packet,{client:g.client,check:async()=>{}}));
+  assert.equal(g.calls.length,0);
+});

@@ -101,3 +101,18 @@ func TestQATimeMenuCommandsAreFixed(t *testing.T) {
 		t.Fatal("arbitrary menu accepted")
 	}
 }
+
+func TestQAWeeklyMenuHasExplicitSynthesisChoice(t *testing.T) {
+	c := qaControl(t, "read", true, "text")
+	c.Card.Binding["menu"] = "weekly"
+	if !cardBinding(c.Card) {
+		t.Fatal("weekly menu rejected")
+	}
+	raw, _ := json.Marshal(cardJSON(c.Card))
+	if !knownCardCommand("周报解读") || !strings.Contains(string(raw), "周报解读") {
+		t.Fatal("weekly synthesis choice missing")
+	}
+	if strings.Contains(string(raw), "按发表时间") {
+		t.Fatal("wrong menu")
+	}
+}

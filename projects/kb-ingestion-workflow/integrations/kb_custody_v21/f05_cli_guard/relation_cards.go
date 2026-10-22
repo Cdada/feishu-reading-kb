@@ -67,7 +67,7 @@ func relationCard(b map[string]any) (string, string, []string) {
 }
 
 func knownCardCommand(command string) bool {
-	for _, value := range []string{"确认入库", "暂不入库", "补充材料后再入库", "按缺图版本继续", "重新发文件", "查看原文依据", "本周周报", "新问题", "按发表时间", "按内容时间", "按入库时间"} {
+	for _, value := range []string{"确认入库", "暂不入库", "补充材料后再入库", "按缺图版本继续", "重新发文件", "查看原文依据", "本周周报", "新问题", "周报解读", "按发表时间", "按内容时间", "按入库时间"} {
 		if value == command {
 			return true
 		}
