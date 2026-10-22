@@ -90,3 +90,14 @@ with BenchmarkCorpus("sample.zip", selection) as sources:
 ```sh
 PYTHONPATH=projects/kb-ingestion-workflow/integrations/kb_custody_v21/src:projects/kb-ingestion-workflow/integrations/kb_custody_v21/tests python -m unittest test_qa_test_design test_qa_benchmark_corpus test_qa_evaluation
 ```
+
+
+## 变体与测试分组
+
+`qa_test_sets.make_variant()` 保留题目家族与候选证据，只复制明确字段。改变时间、材料范围、来源身份或对话条件后，不继承旧标准答案、可回答标签或测试成绩；同义改写也必须复核。输出始终是待审候选题，`proposed_expected_behavior` 只表示出题者建议检查的行为。
+
+`partition_cases(cases, seed=...)` 在划分开发、回归、保留集之前，按题目家族、完全相同正文哈希，以及调用方提供的 `source_lineage`（已核定的同源关系）合并组。同源关系必须来自核查，不能只因标题相同就指定。同一组中任何题已经用于调试（`seen_in_development=true`），整组留在开发集。建题者阅读资料、建立标签本身不等于已将该题用于调试；应按实际用途记录。
+
+默认60/20/20是目标比例。只有一个相互关联的大组时，不会强拆成三个集合制造独立性；报告实际数量、无候选证据题和未核定金标准题。候选检索来源也可能误连成大组，因此这一步只是分组提案，正式冻结前应先核准实际证据及派生关系。近重复但未登记同源关系的材料仍可能泄漏，需要额外复核。
+
+这个模块不执行问答、不评分，也不会把 `gold_status=reviewed` 标签当作它已经验证过事实。语义评测前仍需独立核对证据、必答点和禁止结论；已用于修复的保留题应转入回归范围，并补充新的保留题。
