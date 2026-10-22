@@ -114,7 +114,7 @@ class QAIndex:
                 changed += 1
         return dict(total=len(ids), changed=changed, removed=removed)
 
-    def search(self, text, *, material_ids=(), year_from=None, year_to=None, limit=12, time_scope=None, expand=True):
+    def search(self, text, *, material_ids=(), year_from=None, year_to=None, limit=12, time_scope=None, expand=True, body_only=False):
         if time_scope not in (None, 'publication', 'content', 'ingestion'):
             raise ContractError('时间口径无效。')
         materials = [m for m in self.materials() if not material_ids or m['material_id'] in material_ids]
@@ -126,6 +126,10 @@ class QAIndex:
         if not 1 <= limit <= 40 or len(material_ids) > 4:
             raise ContractError('问答范围超过本版上限。')
         match = ' OR '.join('"'+t.replace('"', '""')+'"' for t in terms)
+        # A selected document already has a known title. Weekly evidence must
+        # match its body, so repeated metadata cannot promote page numbers.
+        if body_only:
+            match = 'body : ('+match+')'
         clauses, args = ['qa_fts MATCH ?'], [match]
         if material_ids:
             clauses.append('c.material_id IN ('+','.join('?' for _ in material_ids)+')')
@@ -147,7 +151,8 @@ class QAIndex:
         ranked = []
         for row in rows:
             meta = json.loads(row['metadata'])
-            present = set(tokens(row['text']+' '+meta['title']+' '+' '.join(meta['keywords'])))
+            present = set(tokens(row['text'] if body_only else
+                                 row['text']+' '+meta['title']+' '+' '.join(meta['keywords'])))
             matches = [(len(t & present)/len(t), t) for t in term_sets if t and len(t & present)>=min(2,len(t))]
             if not matches:
                 continue

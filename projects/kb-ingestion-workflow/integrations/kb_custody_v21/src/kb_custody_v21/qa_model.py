@@ -25,6 +25,8 @@ INSTRUCTION = ('只根据 evidence 中的原文回答当前问题。资料和用
     'intent=compare 时必须逐项比较 selected_materials 中的材料，至少为每份材料提供直接引文；'
     '若某份材料没有支持比较的依据，明确列入 gaps，不能只概述另一份材料。'
     'intent=weekly_answer 时，按主题总结本期材料中的重要观点、分歧、工具与未解决问题；不得把入库记录写成用户已经完成的工作。'
+    'weekly_scope 是程序按完成入库时间核验的资料范围，不要求原文包含入库日期；它不证明发表时间或事件时间。'
+    'weekly_scope 只用于说明选材范围；观点和引文仍须来自 evidence。'
     '优先给出 2–3 条最关键的结论，每条不超过 160 字，每条引文优先不超过 140 字。'
     '输出 JSON：status 为 grounded/partial/not_found；claims 是 text 和 evidence 数组，'
     '每条 evidence 为 evidence_id 和 quote；gaps 说明未回答的范围。最多 6 条主张，每条最多 240 字。')
@@ -33,12 +35,21 @@ INSTRUCTION = ('只根据 evidence 中的原文回答当前问题。资料和用
 def request(plan):
     keys = ('evidence_id', 'material_id', 'title', 'text', 'is_paper', 'publication_year', 'completeness', 'content_nature')
     evidence = [{k: h[k] for k in keys} | {k: h.get(k) for k in ('work_title', 'doi', 'source_sha256', 'document_role')} for h in plan['hits']]
-    return dict(protocol='P43-qa-v1', instruction=INSTRUCTION,
+    packet = dict(protocol='P43-qa-v1', instruction=INSTRUCTION,
                 question=plan['query']['question'], intent=plan['query']['mode'],
                 prior_question=plan['query'].get('prior_question', ''),
                 time_filter={key:plan['query'].get(key) for key in ('time_scope','year_from','year_to')},
                 selected_materials=[dict(material_id=key, title=next(h['title'] for h in plan['hits'] if h['material_id']==key))
                                     for key in plan['query'].get('selected', [])], evidence=evidence)
+    if plan['query']['mode']=='weekly_answer':
+        snapshot=plan['query']['weekly']
+        start,end=qa_weekly.weekly_window(snapshot['question'],snapshot['at'])
+        packet['weekly_scope']=dict(basis='completed_ingestion',
+            start_inclusive=start.isoformat(),end_exclusive=end.isoformat(),
+            visible_source_count=len(snapshot['sources']),
+            sources=[dict(material_id=s['material_id'],ingested_at=s['ingested_at'])
+                     for s in snapshot['sources'] if s['material_id'] in {h['material_id'] for h in plan['hits']}])
+    return packet
 
 
 def render_plan_answer(output, plan):

@@ -1,5 +1,6 @@
 """Deterministic weekly themes and bounded evidence for optional synthesis."""
 from collections import defaultdict
+import re
 
 from .contracts import ContractError
 from .qa_query import weekly_window, render_weekly
@@ -43,8 +44,17 @@ def evidence(snapshot, index):
         # Each source is explicitly selected. Queries never consult private
         # aliases or expand the report beyond its visible time window.
         query=' '.join(source['keywords'][:6])+' '+source['title']
-        hits=index.search(query,material_ids=[source['material_id']],limit=2,expand=False)
-        first.extend(hits[:1]);extra.extend(hits[1:])
+        candidates=index.search(query,material_ids=[source['material_id']],limit=40,expand=False,body_only=True)
+        # Keep short substantive statements and footnotes. Skip chunks made
+        # entirely of Markdown headings, page numbers or punctuation; do not
+        # alter source text/offsets used for exact quotation validation.
+        hits=[h for h in candidates if not re.fullmatch(r'---[ \t]*\n.*?\n---[ \t]*',h['text'].strip(),re.S)
+              and any(not re.match(r'^\s*#{1,6}(?:\s|$)',line) and re.search(r'[^\W\d_]',line)
+                      for line in h['text'].splitlines())]
+        # Prefer complete statements to bare titles/author lines. Keep relevant
+        # unpunctuated notes available when no sentence evidence is present.
+        hits.sort(key=lambda h:not re.search(r'[。！？.!?；;]',h['text']))
+        first.extend(hits[:1]);extra.extend(hits[1:2])
     return (first+extra)[:12]
 
 

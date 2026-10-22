@@ -5,7 +5,7 @@ import unittest
 
 from kb_custody_v21.contracts import ContractError, stable_key
 from kb_custody_v21 import qa_weekly
-from kb_custody_v21.qa_model import render_plan_answer
+from kb_custody_v21.qa_model import render_plan_answer, request
 from kb_custody_v21.qa_query import parse
 import test_qa_engine as fixture
 from test_qa_index import source
@@ -35,6 +35,40 @@ class WeeklyTests(unittest.TestCase):
         self.assertNotIn('私密合成',json.dumps(request,ensure_ascii=False))
         self.assertIn('2 份',job['result']['text']);self.assertIn('原文',job['result']['text'])
         self.assertEqual(render_plan_answer(f.model.saved(job),job['plan']),job['result']['text'])
+
+    def test_summary_passes_verified_ingestion_scope_without_private_metadata(self):
+        f=self.f
+        f.provider.values['private']=source('private',ingested_at=f.clock-30,brief_visibility='exclude')
+        job=f.run_job('周报解读')
+        request=json.loads(f.wire.calls[0]['request'])
+        scope=request['weekly_scope']
+        self.assertEqual(scope['basis'],'completed_ingestion')
+        self.assertEqual({s['material_id'] for s in scope['sources']},{'one','two'})
+        self.assertTrue(all(s['ingested_at']==f.clock-60 for s in scope['sources']))
+        self.assertIn('+08:00',scope['start_inclusive'])
+        self.assertEqual(scope['end_exclusive'],qa_weekly.weekly_window('本周周报',f.clock)[1].isoformat())
+        self.assertNotIn('private',json.dumps(request))
+
+    def test_body_evidence_beats_pages_and_headings_in_long_document(self):
+        f=self.f
+        body='城市演变需要证据地图，但地图不能代替访谈。'
+        note='注：证据地图只覆盖样本区域。'
+        text='\n\n'.join(['---\ntitle: 城市演变的证据地图\nsource: synthetic.example\n---',
+            *(str(i) for i in range(200)), '# 城市演变的证据地图', '城市演变的证据地图 合成作者',body,note])
+        f.provider.values={'one':source(text=text,ingested_at=f.clock-60)}
+        f.index.sync(f.provider)
+        snapshot=qa_weekly.plan(f.index.materials(),'本周周报',f.clock)
+        hits=qa_weekly.evidence(snapshot,f.index)
+        self.assertEqual({h['text'] for h in hits},{body,note})
+        for h in hits:
+            self.assertEqual(text[h['char_start']:h['char_end']],h['text'])
+
+    def test_heading_only_week_does_not_call_model(self):
+        f=self.f
+        f.provider.values={'one':source(text='# 城市演变\n\n## 证据地图\n\n29',ingested_at=f.clock-60)}
+        result=f.run_job('周报解读')['result']
+        self.assertIn('未调用模型',result['text'])
+        self.assertEqual(f.wire.calls,[])
 
     def test_no_materials_and_exhausted_quota_keep_local_report(self):
         f=self.f
@@ -90,6 +124,9 @@ class WeeklyTests(unittest.TestCase):
         hits=qa_weekly.evidence(snapshot,f.index)
         self.assertLessEqual(len(hits),12);self.assertEqual(len({h['material_id'] for h in hits}),8)
         self.assertIn('20 份',qa_weekly.scope(snapshot,hits))
+        packet=request(dict(query=dict(mode='weekly_answer',question='本周周报',weekly=snapshot),hits=hits))
+        self.assertEqual(packet['weekly_scope']['visible_source_count'],20)
+        self.assertEqual(len(packet['weekly_scope']['sources']),8)
 
     def test_explicit_weekly_range_and_prior_keywords(self):
         q=parse('周报解读 2026-01-01 至 2026-01-07')
