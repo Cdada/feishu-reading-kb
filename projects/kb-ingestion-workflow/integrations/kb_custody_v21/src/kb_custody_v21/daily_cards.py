@@ -19,12 +19,14 @@ COMMANDS = {
     'images': ('按缺图版本继续', '重新发文件'),
 }
 COMMANDS.update(RELATION_COMMANDS)
-from .qa_cards import COMMANDS as QA_COMMANDS, HEADER as QA_HEADER, checked_fields as qa_fields
+from .qa_cards import COMMANDS as QA_COMMANDS, HEADER as QA_HEADER, checked_fields as qa_fields, commands as qa_commands
 COMMANDS['qa'] = QA_COMMANDS
 HEADERS = dict(HEADERS, qa=QA_HEADER)
 
 
 def commands(binding):
+    if binding['purpose']=='qa':
+        return qa_commands(binding)
     return relation_commands(binding) if binding['purpose'] in RELATION_COMMANDS else COMMANDS[binding['purpose']]
 
 

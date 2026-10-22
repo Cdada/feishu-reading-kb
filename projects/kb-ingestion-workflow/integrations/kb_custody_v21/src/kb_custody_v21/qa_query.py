@@ -1,6 +1,8 @@
 """Explicit commands, bounded context and deterministic citation rendering."""
 from datetime import datetime, timedelta
 import re
+import time
+from .qa_time import CHOICES, extract, choose
 from zoneinfo import ZoneInfo
 
 from .contracts import ContractError
@@ -8,18 +10,20 @@ from .contracts import ContractError
 HELP = ('可以发送：\n问库：查文献 城市演变\n问库：查出处 “原文中的一句话”\n'
         '问库：综述 城市演变\n问库：工具 数据整理\n问库：比较 1,2 适用条件\n'
         '问库：追问 这一观点有什么限制\n问库：本周周报\n问库：新问题\n'
-        '时间筛选：发表:2010-2020；周报：周报 2026-01-01 至 2026-01-07。'
+        '时间筛选：发表:2010-2020、内容:2010-2020、入库:2026。仅说年份时会先询问时间口径。周报：周报 2026-01-01 至 2026-01-07。'
         '\n只查询已完成整理的测试库；资料编号沿用最近一次结果，引用原文保留原字形。')
 MODES = {'查文献':'search', '查出处':'source', '综述':'answer', '工具':'tools', '比较':'compare', '追问':'followup'}
 
 
-def parse(text, context=None):
+def parse(text, context=None, *, now=None):
     context = context or {}
     if not isinstance(text, str) or len(text) > 2000:
         raise ContractError('问题请控制在 2000 字内。')
     text = re.sub(r'^问库\s*[:：]\s*', '', text.strip())
     if text in ('帮助', '菜单', '问库', ''):
         return dict(mode='help', question='', selected=[])
+    if text in CHOICES:
+        return choose(context.get('pending_time', {}), text)
     if text in ('新问题', '重新开始'):
         return dict(mode='reset', question='', selected=[])
     if text.startswith(('本周周报', '上周周报', '周报')):
@@ -45,23 +49,31 @@ def parse(text, context=None):
         if not context.get('question'):
             raise ContractError('当前没有可追问的问题，请先发送一个完整问题。')
         selected = context.get('selected', [])
-    dates = re.search(r'发表\s*[:：]\s*(\d{4})(?:\s*[-—至]\s*(\d{4}))?', text)
-    year_from = year_to = None
-    if dates:
-        year_from, year_to = int(dates[1]), int(dates[2] or dates[1])
-        if not 1000 <= year_from <= year_to <= 9999:
-            raise ContractError('发表年份区间无效。')
-        text = text[:dates.start()]+text[dates.end():]
-    elif mode == 'followup':
+    # A year inside a verbatim quotation remains part of that quotation.
+    exact = mode=='source' and re.search(r'[“「"](.+)[”」"]', text)
+    if exact:
+        before, timing = extract(text[:exact.start()], {}, now if now is not None else time.time())
+        after, extra = extract(text[exact.end():], {}, now if now is not None else time.time())
+        if timing and extra:
+            raise ContractError('一次查询请指定一个时间区间。')
+        timing = timing or extra
+        text = before+exact[0]+after
+    else:
+        text, timing = extract(text, context if mode=='followup' else {}, now if now is not None else time.time())
+    year_from, year_to = timing.get('year_from'), timing.get('year_to')
+    if not timing and mode=='followup':
         year_from, year_to = context.get('year_from'), context.get('year_to')
+        timing = dict(time_scope=context.get('time_scope'))
     if re.search(r'最新|现行|目前有效|现在有效', text) and not selected:
-        return dict(mode='version', question=text, selected=[], year_from=year_from, year_to=year_to)
+        mode = 'version'
     # User question history is retrieval context, never factual evidence.
     query = (context.get('question', '')+' '+text if mode in ('followup', 'compare') else text)
     query = re.sub(r'请|帮我|目前|关于|有哪些|相关的|相关|文献|研究成果|相应的|阐述|知识库|记录了哪些|是什么|这个问题|怎么|如何', ' ', query)
     if mode == 'tools':
         query += ' 工具 软件'
-    return dict(mode=mode, question=text.strip(), query=query.strip(), selected=selected,
+    return dict(mode='clarify' if timing.get('needs_time') else mode, original_mode=mode,
+                time_scope=timing.get('time_scope', 'publication' if year_from else None),
+                question=text.strip(), query=query.strip(), selected=selected,
                 year_from=year_from, year_to=year_to,
                 prior_question=context.get('question', '') if mode == 'followup' else '')
 
@@ -81,6 +93,9 @@ def render_search(hits, *, version=False):
     if not hits:
         return '当前检索范围内未找到可引用的原文。可以缩短关键词、换用同义词或扩大发表年份；这不代表库中一定没有相关资料。'
     result = ['找到以下原文依据（按检索相关性排序）：']
+    expanded = list(dict.fromkeys(v for h in hits for v in h.get('query_expansions', [])))
+    if expanded:
+        result.append('检索同时尝试名称：'+'；'.join(expanded[:7])+'。名称扩展仅用于查找，结论仍以原文为准。')
     seen = set()
     for hit in hits:
         if hit['material_id'] in seen:

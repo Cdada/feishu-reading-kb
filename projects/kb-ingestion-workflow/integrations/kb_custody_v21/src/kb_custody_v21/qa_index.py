@@ -12,6 +12,9 @@ import unicodedata
 
 from .contracts import ContractError
 from .registry import encoded
+from .qa_language import declared_aliases, variants
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from .runtime import no_symlinks
 
 SCHEMA = '''
@@ -95,6 +98,7 @@ class QAIndex:
         for key in ids:
             source = provider.get(key)
             metadata = {k: v for k, v in source.items() if k not in ('text', 'evidence')}
+            metadata['aliases'] = declared_aliases('\n\n'.join(body for *_, body in chunks(source)))
             digest = hashlib.sha256(encoded(metadata).encode()).hexdigest()
             if old.get(key) == digest:
                 continue
@@ -110,8 +114,13 @@ class QAIndex:
                 changed += 1
         return dict(total=len(ids), changed=changed, removed=removed)
 
-    def search(self, text, *, material_ids=(), year_from=None, year_to=None, limit=12):
-        terms = tokens(text)[:80]
+    def search(self, text, *, material_ids=(), year_from=None, year_to=None, limit=12, time_scope=None, expand=True):
+        if time_scope not in (None, 'publication', 'content', 'ingestion'):
+            raise ContractError('时间口径无效。')
+        materials = [m for m in self.materials() if not material_ids or m['material_id'] in material_ids]
+        alternatives = variants(text, materials) if expand else [text]
+        term_sets = [set(tokens(v)[:80]) for v in alternatives]
+        terms = list(dict.fromkeys(t for v in alternatives for t in tokens(v)))[:240]
         if not terms:
             return []
         if not 1 <= limit <= 40 or len(material_ids) > 4:
@@ -122,9 +131,15 @@ class QAIndex:
             clauses.append('c.material_id IN ('+','.join('?' for _ in material_ids)+')')
             args.extend(material_ids)
         for year, op in ((year_from, '>='), (year_to, '<=')):
-            if year is not None:
+            if year is not None and time_scope in (None, 'publication'):
                 clauses.append("json_extract(s.metadata,'$.publication_year') "+op+' ?')
                 args.append(year)
+            elif year is not None and time_scope == 'ingestion':
+                if year == 9999 and op == '<=':
+                    continue
+                boundary = datetime(year if op=='>=' else year+1, 1, 1, tzinfo=ZoneInfo('Asia/Shanghai')).timestamp()
+                clauses.append("json_extract(s.metadata,'$.ingested_at') "+('>=' if op=='>=' else '<')+' ?')
+                args.append(boundary)
         with self.connection() as db:
             rows = db.execute('SELECT c.*,s.metadata,bm25(qa_fts,4,2,1) AS rank FROM qa_fts '
                 'JOIN qa_chunks c ON c.id=qa_fts.rowid JOIN qa_sources s ON s.id=c.material_id WHERE '
@@ -132,12 +147,21 @@ class QAIndex:
         ranked = []
         for row in rows:
             meta = json.loads(row['metadata'])
-            overlap = set(terms) & set(tokens(row['text']+' '+meta['title']+' '+' '.join(meta['keywords'])))
+            present = set(tokens(row['text']+' '+meta['title']+' '+' '.join(meta['keywords'])))
+            matches = [(len(t & present)/len(t), t) for t in term_sets if t and len(t & present)>=min(2,len(t))]
+            if not matches:
+                continue
+            score, matched = max(matches, key=lambda value:value[0])
+            overlap = matched & present
+            if time_scope == 'content' and year_from is not None:
+                years = [int(y) for y in re.findall(r'(?<![0-9])([12][0-9]{3})(?![0-9])',row['text'])]
+                if not any(year_from <= y <= (year_to or year_from) for y in years):
+                    continue
             # Discard accidental one-bigram matches in a long natural question.
-            if len(overlap) < min(2, len(terms)):
+            if len(overlap) < min(2, len(matched)):
                 continue
             hit = dict(meta, text=row['text'], char_start=row['start'], char_end=row['end'],
-                       paragraph=row['paragraph'], heading=row['heading'], score=len(overlap)/len(terms))
+                       paragraph=row['paragraph'], heading=row['heading'], score=score, query_expansions=alternatives[1:])
             hit['physical_pages'] = sorted({p['page'] for p in meta.get('pages', [])
                                            if p['char_start'] < row['end'] and row['start'] < p['char_end']})
             hit['evidence_id'] = hashlib.sha256(encoded([meta['material_id'], meta['body_sha256'], row['start'], row['end']]).encode()).hexdigest()[:24]

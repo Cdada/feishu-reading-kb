@@ -81,7 +81,9 @@ class QAStore:
         query = plan['query']
         context = dict(question=query['question'], selected=query['selected'],
             materials=list(dict.fromkeys(h['material_id'] for h in result['hits']))[:8],
-            year_from=query.get('year_from'), year_to=query.get('year_to'))
+            year_from=query.get('year_from'), year_to=query.get('year_to'),time_scope=query.get('time_scope'))
+        if query['mode']=='clarify':
+            context['pending_time']=query
         with self.daily.transaction() as db:
             db.execute('INSERT OR IGNORE INTO qa_context VALUES (?,?,?)', (conversation, encoded(context), row['created']))
 

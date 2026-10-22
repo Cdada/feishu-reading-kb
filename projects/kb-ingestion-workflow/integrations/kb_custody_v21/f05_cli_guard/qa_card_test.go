@@ -80,3 +80,24 @@ func TestQARejectsUnboundDocumentTargetsAndCommands(t *testing.T) {
 		t.Fatal("arbitrary callback accepted")
 	}
 }
+
+func TestQATimeMenuCommandsAreFixed(t *testing.T) {
+	c := qaControl(t, "read", true, "text")
+	c.Card.Binding["menu"] = "time"
+	if !cardBinding(c.Card) {
+		t.Fatal("time menu binding rejected")
+	}
+	raw, _ := json.Marshal(cardJSON(c.Card))
+	for _, command := range []string{"按发表时间", "按内容时间", "按入库时间"} {
+		if !strings.Contains(string(raw), command) || !knownCardCommand(command) {
+			t.Fatal("time command not rendered or admitted", command)
+		}
+	}
+	if strings.Contains(string(raw), "本周周报") {
+		t.Fatal("mixed time and normal menu")
+	}
+	c.Card.Binding["menu"] = "custom"
+	if cardBinding(c.Card) {
+		t.Fatal("arbitrary menu accepted")
+	}
+}

@@ -13,6 +13,7 @@ from .qa_engine import QAEngine
 from .qa_index import QAIndex
 from .qa_model import QAModel, render_answer, render_evidence
 from .qa_query import HELP, render_search
+from .qa_time import CHOICES, describe
 from .qa_sources import QASources
 from .qa_store import QAStore
 from .registry import encoded
@@ -110,6 +111,8 @@ class QAFlow:
             else:
                 output = self.model.saved(job)
                 text = render_answer(output, result['hits'], job['plan']['query'].get('selected', []) if job['plan']['query']['mode']=='compare' else ()) if output is not None else result['text']
+                if output is not None:
+                    text=describe(text,job['plan']['query'])
             if saved is None:
                 self.daily.put('qa-delivery-text:'+job['id'], text)
             else:
@@ -129,7 +132,9 @@ class QAFlow:
             binding = dict(purpose='qa', document_id=job['message_id'], source_sha256=hashlib.sha256(job['text'].encode()).hexdigest(),
                 target_message_id=job['delivery']['message_id'], job_id=job['id'],
                 details='可以继续发送“问库：追问 …”。以下选项仅作用于这次问答，不会把回答写入知识库。')
-            card = b.card_flow.cards.prepare(binding, '继续查询测试知识库')
+            if job['result'].get('menu')=='time':
+                binding['menu']='time'
+            card = b.card_flow.cards.prepare(binding, '选择时间口径' if binding.get('menu')=='time' else '继续查询测试知识库')
             if card['state']=='prepared':
                 b.card_flow.delivery.send(card, job['delivery']['receipt'])
                 return  # Bound platform work per collection tick.
@@ -137,7 +142,10 @@ class QAFlow:
             if choice and choice['result'] is None:
                 command = choice['command']
                 key = stable_key('qa-card-choice', card['card_id'])
-                if command=='查看原文依据':
+                if command in CHOICES:
+                    self.store.enqueue(key,job['message_id'],command,dict(receipts=choice['evidence']['receipts'],
+                        qa_time_choice=dict(job_id=job['id'],command=command)),conversation=job['conversation'])
+                elif command=='查看原文依据':
                     created = self.store.enqueue(key, job['message_id'], '帮助', dict(receipts=choice['evidence']['receipts']), conversation=job['conversation'])
                     if created['state']=='queued':
                         self.sources.verify(job['result']['hits'])
