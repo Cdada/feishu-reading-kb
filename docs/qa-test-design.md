@@ -59,3 +59,34 @@ flowchart LR
 真实历史题、资料画像、原文、哈希清单和报告只存本地忽略目录；公开仓库使用独立合成示例。使用现有累计账本，新评测预算不得绕过或重置。
 
 评测方法参考 [OpenAI evaluation best practices](https://developers.openai.com/api/docs/guides/evaluation-best-practices)：按真实任务构建题目，结合自动检查与人工校准，并留意模型裁判的位置和篇幅偏差。本模块不依赖云端评测服务。
+
+
+## 只读资料适配与独立索引
+
+`qa_benchmark_corpus.BenchmarkCorpus` 可以只读使用 ZIP 中明确选中的 `.md` / `.txt` 转换成果。它与飞书入库提供器分开，不伪造确认记录、不自动批准来源、不解压原件。可传给既有 `QAIndex.sync()`，输出目录应选独立、被 Git 忽略的评测目录，不能复用日常问答索引。
+
+```python
+from pathlib import Path
+from kb_custody_v21.qa_benchmark_corpus import BenchmarkCorpus
+from kb_custody_v21.qa_index import QAIndex
+
+selection = [{
+    "id": "sample-a", "path": "sample/experiment.md",
+    "title": "轨道测量实验", "role": "record", "canonical_id": "experiment-a",
+}]
+with BenchmarkCorpus("sample.zip", selection) as sources:
+    # 先读取、核对正文，保存 body_sha256；复跑时在 selection 中填入该值。
+    source = sources.get("sample-a")
+    index = QAIndex(Path(".dev-runtime/qa-eval/index.sqlite3").resolve())
+    index.sync(sources)
+```
+
+读取器显式使用 UTF-8 文件名编码，检查路径冲突、符号链接、重复选择、文件及总量上限；忽略 macOS 元数据。正文必须已是有效 UTF-8，不在此处重新 OCR。提供正文哈希时，不一致即失败。来源角色与 canonical_id（同源资料分组标识）由调用方核验，不能因文件夹名或相同标题就确认来源权威、版本替代或派生关系；相同正文哈希只证明文字一致。
+
+输出标记 `benchmark_only=true`，日期与完整性保持未知；不会用 ZIP 修改时间补成发表日期。`body_sha256` 绑定解码后的文字，`source_sha256` 绑定 ZIP 条目原始字节，两者不等于整份原始 PDF 的哈希。证据校准应保存具体范围、原文位置、必答要点和禁止结论；对转换文字的未检出结果，不可扩张为全部原件或库外资料从未出现。
+
+本地合成验证命令（仓库根目录）：
+
+```sh
+PYTHONPATH=projects/kb-ingestion-workflow/integrations/kb_custody_v21/src:projects/kb-ingestion-workflow/integrations/kb_custody_v21/tests python -m unittest test_qa_test_design test_qa_benchmark_corpus test_qa_evaluation
+```
