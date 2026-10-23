@@ -394,7 +394,7 @@ type pilotCredentialGate struct{ g *Guard }
 func (p pilotCredentialGate) Name() string  { return "kb-pilot-credential-window" }
 func (p pilotCredentialGate) Priority() int { return -100 }
 func (p pilotCredentialGate) ResolveAccount(context.Context) (*credential.Account, error) {
-	if err := p.g.check(); err != nil {
+	if err := p.g.checkCached(); err != nil {
 		return nil, &credential.BlockError{Provider: p.Name(), Reason: "approved window or evidence changed"}
 	}
 	return nil, nil

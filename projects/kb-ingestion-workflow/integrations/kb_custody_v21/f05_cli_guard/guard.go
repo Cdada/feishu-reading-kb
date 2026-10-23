@@ -66,12 +66,14 @@ var targets = map[string]*regexp.Regexp{
 }
 
 type Guard struct {
-	c      Control
-	now    func() time.Time
-	mu     sync.Mutex
-	failed bool
-	lock   *os.File
-	pilot  *pilotSession
+	c        Control
+	now      func() time.Time
+	mu       sync.Mutex
+	failed   bool
+	lock     *os.File
+	pilot    *pilotSession
+	frozenMu sync.Mutex
+	verified map[string]verifiedFile
 }
 
 func noLinks(p string) error {
@@ -207,7 +209,16 @@ func (g *Guard) Name() string                                             { retu
 func (g *Guard) ResolveInterceptor(context.Context) transport.Interceptor { return g }
 func (g *Guard) PreRoundTrip(*http.Request) func(*http.Response, error)   { return nil }
 
-func (g *Guard) check() error {
+// Physical access always rehashes the entire manifest, even on a cache hit.
+func (g *Guard) check() error { return g.checkFrozen(true) }
+
+// Only local checkpoints inside this Guard reuse verified bytes. Every path,
+// file identity, size, mode, mtime and ctime is still checked; no disk cache.
+func (g *Guard) checkCached() error { return g.checkFrozen(false) }
+
+func (g *Guard) checkFrozen(force bool) error {
+	g.frozenMu.Lock()
+	defer g.frozenMu.Unlock()
 	if g.failed {
 		return errors.New("channel stopped")
 	}
@@ -220,20 +231,8 @@ func (g *Guard) check() error {
 		n.Before(g.c.StartsAt) || !n.Before(g.c.ExpiresAt) {
 		return errors.New("outside approved window")
 	}
-	for p, want := range g.c.Frozen {
-		if err := noLinks(p); err != nil {
-			return err
-		}
-		f, e := os.Open(p)
-		if e != nil {
-			return e
-		}
-		h := sha256.New()
-		_, e = io.Copy(h, f)
-		f.Close()
-		if e != nil || hex.EncodeToString(h.Sum(nil)) != want {
-			return errors.New("frozen evidence changed")
-		}
+	if err := g.verifyFrozen(force); err != nil {
+		return err
 	}
 	// Hashing evidence may cross the deadline. Recheck at the access boundary.
 	if g.now().Before(g.c.StartsAt) || !g.now().Before(g.c.ExpiresAt) {
@@ -489,7 +488,7 @@ func (g *Guard) PreRoundTripE(req *http.Request) (func(*http.Response, error), e
 			valid = valid && err == nil
 		}
 		if g.pilot != nil {
-			valid = valid && g.check() == nil
+			valid = valid && g.checkCached() == nil
 		}
 		if valid {
 			v.Type = "complete"

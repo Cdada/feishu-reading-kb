@@ -122,7 +122,7 @@ func executeCLI(c Control, g *Guard, opts ...cmd.BuildOption) bool {
 		defer os.Chdir(old)
 	}
 	if g.pilot != nil {
-		if g.check() != nil {
+		if g.checkCached() != nil {
 			return false
 		}
 		credential.Register(pilotCredentialGate{g})
@@ -150,7 +150,7 @@ func executeCLI(c Control, g *Guard, opts ...cmd.BuildOption) bool {
 		ok = ok && obj["ok"] == true && obj["identity"] == "bot" && !g.failed
 	}
 	if g.pilot != nil {
-		ok = ok && g.check() == nil
+		ok = ok && g.checkCached() == nil
 	}
 	return ok
 }
