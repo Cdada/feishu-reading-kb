@@ -3,11 +3,27 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import signal
 
 from .contracts import ContractError
 from .daily_store import Deferred
 from .pilot_text import MAX_BYTES, TEXT_ENVIRONMENT
 from .registry import encoded
+
+
+def probe(command, packet):
+    with subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL, start_new_session=True,
+            env={k:os.environ[k] for k in TEXT_ENVIRONMENT if k in os.environ}) as process:
+        try:
+            output, _ = process.communicate(encoded(packet).encode(), timeout=60)
+        except subprocess.TimeoutExpired:
+            os.killpg(process.pid, signal.SIGKILL)
+            process.communicate()
+            raise
+        if process.returncode or len(output) > MAX_BYTES:
+            raise OSError('subscription probe failed')
+        return json.loads(output)
 
 
 def require_subscription(authority, store):
@@ -30,13 +46,8 @@ def require_subscription(authority, store):
     if os.environ.get('KB_V21_OFFLINE_TEST') == '1':
         raise ContractError('real subscription admission disabled in offline tests')
     try:
-        result = subprocess.run([config['text_node'], str(script)], input=encoded(packet).encode(),
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=60,
-            env={k: os.environ[k] for k in TEXT_ENVIRONMENT if k in os.environ})
-        if result.returncode or len(result.stdout) > MAX_BYTES:
-            raise OSError('subscription probe failed')
-        response = json.loads(result.stdout)
-        if response.get('state') not in ('ready', 'waiting'):
+        response = probe([config['text_node'], str(script)], packet)
+        if not isinstance(response, dict) or response.get('state') not in ('ready', 'waiting'):
             raise ValueError('invalid subscription probe')
     except (OSError, subprocess.TimeoutExpired, ValueError, TypeError) as error:
         response = dict(state='waiting', reason='subscription_check_unavailable')

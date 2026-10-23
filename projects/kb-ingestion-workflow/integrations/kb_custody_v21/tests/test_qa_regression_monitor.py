@@ -57,3 +57,24 @@ class MonitorTests(unittest.TestCase):
         self.archive.unlink()
         with self.assertRaises(FileNotFoundError):self.run_tick()
         self.assertEqual((self.state/'state.local.json').read_bytes(),before)
+
+    def test_explicit_synthetic_sources_are_separate_from_real_library(self):
+        synthetic=fixture('boundary',body='Invented boundary test. No real project.')
+        source_id='synthetic-boundary'
+        from kb_custody_v21.qa_test_fixtures import compile_fixture
+        text='Invented boundary test. No real project.'
+        synthetic=compile_fixture(dict(id='boundary',question='Is this real?',selectors=[dict(material_id=source_id,
+            body_sha256=hashlib.sha256(text.encode()).hexdigest(),start=0,end=len(text))],constraints=['Use only the synthetic control.'],conversation=[],
+            expected=dict(answerability='supported',required_claims=['Invented.'],forbidden_claims=['Real.'])),
+            {source_id:dict(title='Synthetic control',role='record',text=text)})
+        self.cases.write_text(json.dumps([self.case,synthetic]))
+        controls=self.root/'controls.json';controls.write_text(json.dumps([dict(id=source_id,text=text)]))
+        config=json.loads(self.config.read_bytes());config['synthetic_sources']=dict(path=str(controls),sha256=file_sha(controls))
+        self.config.write_text(json.dumps(config))
+        result=self.run_tick()
+        self.assertTrue(result['offline_checks_passed'])
+        self.assertEqual(result['selected_sources'],1);self.assertEqual(result['synthetic_sources'],1)
+        self.assertEqual(result['synthetic_cases'],1);self.assertEqual(result['model_calls'],0)
+        controls.write_text('[]')
+        from kb_custody_v21.contracts import ContractError
+        with self.assertRaisesRegex(ContractError,'manifest changed'):self.run_tick()

@@ -122,6 +122,7 @@ export function makeAccessCheck(binding, now = () => Date.now()) {
     for (const [path, hash] of Object.entries(binding.files)) await boundFile(path, hash, false);
     await boundFile(binding.approvalPath, binding.approvalSha);
     window(); // Hashing a large source inventory can cross the deadline.
+    if (binding.dailyRulesPath != null) minimumRemainingPercent = await standingReserve(binding.dailyRulesPath, binding.dailyRulesSha, now);
     return { minimumRemainingPercent };
   };
 }

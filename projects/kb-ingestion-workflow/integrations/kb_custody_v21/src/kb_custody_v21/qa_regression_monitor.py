@@ -66,7 +66,8 @@ def monitor(config_path, expected_sha, *, now=None):
     config_path = no_symlinks(Path(config_path).absolute())
     require(sha(expected_sha) and file_sha(config_path) == expected_sha, 'approved monitor configuration changed')
     config = read_json(config_path)
-    require(set(config) == {'version','archive','selection','cases','corpus_id','system_files','state_root'}
+    required = {'version','archive','selection','cases','corpus_id','system_files','state_root'}
+    require(required <= set(config) <= required | {'synthetic_sources'}
         and config['version'] == 'qa-offline-monitor-v1', 'explicit offline monitor configuration required')
     for key in ('archive','selection','cases','state_root'):
         require(Path(config[key]).is_absolute(), 'absolute monitor paths required')
@@ -91,6 +92,25 @@ def _tick(config, root, now):
     cases = load_cases(config['cases'])
     selection = read_json(config['selection'])
     current, inventory = observe(source, selection, config['corpus_id'])
+    real_source_count = len(current['sources'])
+    synthetic_ids = set()
+    if 'synthetic_sources' in config:
+        binding = config['synthetic_sources']
+        require(isinstance(binding, dict) and set(binding) == {'path','sha256'}
+            and Path(binding['path']).is_absolute() and sha(binding['sha256']), 'explicit synthetic source binding required')
+        require(file_sha(no_symlinks(Path(binding['path']))) == binding['sha256'], 'synthetic control manifest changed')
+        controls = read_json(binding['path'])
+        require(isinstance(controls, list) and len(controls) <= 100, 'bounded explicit synthetic controls required')
+        real_ids = {s['id'] for s in current['sources']}
+        for control in controls:
+            require(isinstance(control, dict) and set(control) == {'id','text'}
+                and isinstance(control['id'], str) and control['id'] and control['id'] not in real_ids | synthetic_ids
+                and isinstance(control['text'], str) and 0 < len(control['text'].encode()) <= 1_000_000,
+                'unique synthetic source and bounded full text required')
+            synthetic_ids.add(control['id'])
+            current['sources'].append(dict(id=control['id'], canonical_id='synthetic:'+control['id'],
+                body_sha256=hashlib.sha256(control['text'].encode()).hexdigest(),
+                metadata_sha256=digest(dict(kind='synthetic_control',id=control['id'])), critical=False))
     system_hash = digest({p:file_sha(no_symlinks(Path(p))) for p in config['system_files']})
     identity = digest(dict(snapshot=current, inventory=inventory, cases=[c['fixture_sha256'] for c in cases],
         system=system_hash, periods=periods(now)))
@@ -104,7 +124,8 @@ def _tick(config, root, now):
     reviewed_paths = {r['path'] for r in selection}
     unreviewed_changes = sorted((set(state.get('unreviewed_changes', [])) |
         {p for p in changed_members if p not in reviewed_paths}) - reviewed_paths)
-    fingerprint = digest([system_hash, digest(inventory), [c['fixture_sha256'] for c in cases]])
+    fingerprint = digest([system_hash, [c['fixture_sha256'] for c in cases],
+        {name:new_inventory.get(name) for name in unreviewed_changes}])
     plan = plan_regression(state.get('snapshot'), current, cases, now=now, enabled=True,
         system_fingerprint=fingerprint, last_completed=state.get('watermarks'), include_heldout=False)
     require(plan['state'] == 'ready', 'changed monitor state must produce a plan')
@@ -113,11 +134,14 @@ def _tick(config, root, now):
     eligible = {c['id']:c for c in cases if c.get('split') != 'heldout'}
     def evaluate(case_id):
         verify_fixture(eligible[case_id])
-        return dict(id=case_id, status='passed', check='fixture_integrity_and_current_source_hash',
+        return dict(id=case_id, status='passed', check='fixture_integrity_and_bound_source_hash',
+            synthetic_source_ids=sorted(set(eligible[case_id]['evidence_bindings']) & synthetic_ids),
             model_calls=0, semantic_quality_tested=False)
     task = store.run(key, evaluate)
     result = dict(version='qa-offline-monitor-result-v1', at=now.isoformat(), task_key=key,
-        state=task['state'], checked=len(task['results']), selected_sources=len(current['sources']),
+        state=task['state'], checked=len(task['results']), selected_sources=real_source_count,
+        synthetic_sources=len(synthetic_ids),
+        synthetic_cases=sum(bool(set(eligible[row['id']]['evidence_bindings']) & synthetic_ids) for row in task['results']),
         passed=sum(r['status']=='passed' for r in task['results']),
         needs_review=sum(r['status']=='needs_review' for r in task['results']),
         failed=sum(r['status']=='failed' for r in task['results']), changed_members=len(changed_members),
@@ -126,7 +150,8 @@ def _tick(config, root, now):
         semantic_candidates=len(plan['semantic_case_ids']), schedules_managed_externally=True,
         limitation='Checks current selected text and frozen cases; does not score generated answers or audit full-corpus answerability.')
     result['offline_checks_passed'] = task['state']=='completed' and bool(task['results']) and result['passed']==len(task['results']) and not unreviewed_changes
-    fingerprint = digest({k:result[k] for k in ('state','checked','passed','needs_review','failed','unreviewed_member_changes')})
+    fingerprint = digest(dict(state=task['state'],
+        cases=[(row['id'],row['status']) for row in task['results']], unreviewed_changes=unreviewed_changes))
     result['notify'] = fingerprint != state.get('notification_fingerprint')
     report = root/(key+'.report.local.json')
     durable_file(root/(key+'.plan.local.json'), plan)

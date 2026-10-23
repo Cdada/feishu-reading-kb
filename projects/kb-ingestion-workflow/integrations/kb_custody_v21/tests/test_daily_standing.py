@@ -57,9 +57,9 @@ class StandingPolicyTests(unittest.TestCase):
             authority=SimpleNamespace(digest='a'*64,path=root/'rules.json',runtime=SimpleNamespace(worktree=root),
                 check=lambda:{str(script):'b'*64},config={'guide_plan':str(guide),'text_script':str(root/'pilot-reading-guide.mjs'),
                 'codex_binary':'synthetic-codex','text_node':'synthetic-node'})
-            blocked=SimpleNamespace(returncode=0,stdout=b'{"state":"waiting","reason":"quota_threshold_reached"}')
-            ready=SimpleNamespace(returncode=0,stdout=b'{"state":"ready"}')
-            with patch.dict('os.environ',{'KB_V21_OFFLINE_TEST':'0'}),patch('kb_custody_v21.daily_subscription.subprocess.run',side_effect=[blocked,ready]) as run:
+            blocked=dict(state='waiting',reason='quota_threshold_reached')
+            ready=dict(state='ready')
+            with patch.dict('os.environ',{'KB_V21_OFFLINE_TEST':'0'}),patch('kb_custody_v21.daily_subscription.probe',side_effect=[blocked,ready]) as run:
                 with self.assertRaisesRegex(Deferred,'subscription_quota_wait'):require_subscription(authority,store)
                 with self.assertRaises(Deferred):require_subscription(authority,store)
                 self.assertEqual(run.call_count,1)
@@ -67,6 +67,18 @@ class StandingPolicyTests(unittest.TestCase):
                 now[0]+=300;require_subscription(authority,store)
                 self.assertIsNone(store.get('subscription-admission'))
                 self.assertEqual(store.summary()['model_turns'],0)
+
+    def test_probe_timeout_stops_only_its_own_process_group(self):
+        import subprocess
+        import signal
+        from kb_custody_v21.daily_subscription import probe
+        with patch('kb_custody_v21.daily_subscription.subprocess.Popen') as popen, patch('kb_custody_v21.daily_subscription.os.killpg') as kill:
+            process=popen.return_value.__enter__.return_value
+            process.pid=12345
+            process.communicate.side_effect=[subprocess.TimeoutExpired('synthetic',60),(b'',b'')]
+            with self.assertRaises(subprocess.TimeoutExpired):probe(['synthetic'],{})
+            self.assertTrue(popen.call_args.kwargs['start_new_session'])
+            kill.assert_called_once_with(12345,signal.SIGKILL)
 
 
 class StandingIntegrationTests(unittest.TestCase):
