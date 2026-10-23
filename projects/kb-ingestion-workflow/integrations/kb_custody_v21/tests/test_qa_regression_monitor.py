@@ -78,3 +78,15 @@ class MonitorTests(unittest.TestCase):
         controls.write_text('[]')
         from kb_custody_v21.contracts import ContractError
         with self.assertRaisesRegex(ContractError,'manifest changed'):self.run_tick()
+
+    def test_serialized_inventory_does_not_invent_changes_on_weekly_or_system_trigger(self):
+        self.run_tick()
+        self.system.write_text('# new synthetic system revision')
+        changed=self.run_tick()
+        self.assertEqual(changed['changed_members'],0)
+        self.assertEqual(changed['unreviewed_member_changes'],0)
+        self.assertTrue(changed['offline_checks_passed'])
+        self.now+=timedelta(days=7)
+        weekly=self.run_tick()
+        self.assertEqual(weekly['changed_members'],0)
+        self.assertTrue(weekly['offline_checks_passed'])

@@ -117,8 +117,8 @@ def _tick(config, root, now):
     if state.get('identity') == identity:
         return dict(state='unchanged', model_calls=0, semantic_quality_tested=False, notify=False,
             last_report=state['report'])
-    old_inventory = {r[0]:r[1:] for r in state.get('inventory', inventory)}
-    new_inventory = {r[0]:r[1:] for r in inventory}
+    old_inventory = {r[0]:tuple(r[1:]) for r in state.get('inventory', inventory)}
+    new_inventory = {r[0]:tuple(r[1:]) for r in inventory}
     changed_members = sorted(k for k in set(old_inventory) | set(new_inventory) if old_inventory.get(k) != new_inventory.get(k))
     # Changes outside reviewed dependencies must not silently retain old coverage.
     reviewed_paths = {r['path'] for r in selection}
