@@ -32,7 +32,7 @@ PYTHONPATH=projects/kb-ingestion-workflow/integrations/kb_custody_v21/src:projec
 
 `qa_quality_runner.run_case()` 可通过调用方提供的回答与裁判适配器串联一题；不提供完整授权和适配器时返回 `skipped`。`EvaluationCalls` 在现有 `DailyStore` 的 `daily_models` 表中预留次数，再执行一次调用。回答、裁判、失败和不明结果使用同一累计上限，没有新的免费计数器。
 
-评测授权必须绑定现有账本路径、身份、日常规则摘要、有效期、模型配置摘要、总调用上限、输入输出大小，并由调用方每次重新核验授权证据。它不能扩大日常累计上限；同一授权跨多次运行累计使用，不能改授权ID对应的范围。适配器只允许单次订阅通道调用，不得在内部重试；本工具不创建真实模型客户端或付费API入口。
+评测授权必须绑定现有账本路径、身份、日常规则摘要、有效期、模型配置摘要、总调用上限、输入输出大小，并由调用方每次重新核验授权证据。它不能扩大日常累计上限；同一授权跨多次运行累计使用，不能改授权ID对应的范围。账本本身不创建模型客户端；订阅适配器需显式配置，仅执行单次调用，不得内部重试，也不提供付费API入口。
 
 超时先记 `unknown`，不自动重发；程序异常保留 `started` 意图以便检查。重启可复用已保存、重新验证的答案，再继续未开始的裁判步骤；不明或被拒绝步骤不会重发。新授权也不能让同一不明请求自动重试。报告区分新调用和缓存，token缺失明确标为未知，不能填零。实际返回的模型版本变化会阻止不适当的提示词比较。
 
@@ -90,8 +90,22 @@ python -m kb_custody_v21.qa_quality_cli compare --baseline .dev-runtime/eval/old
 
 `prepare` 有超限题、`score` 未全部通过、`compare` 不建议放行、`check` 未全部完成离线检查时，退出码为2，并仍保留报告。输入错误会明确失败。`plan`和`retrieve`是规划/诊断命令，退出码0只代表完成该命令；任何离线成功都不代表语义问答通过。
 
+## 订阅模型接入与逐步验收
+
+`qa_quality_subscription.SubscriptionAdapter` 使用现有 `CodexTextWire`，入口为 `pilot-qa-quality.mjs`。固定沿用 GPT-6.1 Sol / medium 与 ChatGPT 订阅通道；每次核验账号摘要、剩余额度、无付费余额备用、授权期限、源码与输入摘要。它不启动归档服务，不提供模型重试，不改变日常问答提示词。
+
+回答与裁判使用不同的固定 JSON 结构。每个请求使用无工具、无联网、无文件读取的临时线程，资料仅通过输入传入；裁判请求只传一次证据正文，避免重复占用上下文。接入层记录服务器确认的模型型号及该回合实际 token 用量；无用量通知时保留未知。型号不等于固定模型修订号，服务未提供修订号时不能声称版本完全可复现。
+
+`qa_quality_pilot.run_calibration()` 接受事先冻结的20–40道独立对照题及正确/错误判断。每道题仅调用一次裁判，不生成新的候选答案。前4题出现判定不一致、任何关键错误误判或不确定判断即停止，保留原对照与结果；不得换掉困难样本。全部完成后沿用至少90%判定一致、关键错误全部一致的门槛。参考真实性仍需独立检查，程序不会把自行填写的“已复核”标签当成业务专家证明。
+
+只有校准通过，`run_answer_pilot()` 才允许1–4道非保留题生成回答并评分。执行失败或出现关键答案错误即停止，报告保留未测题分母。建议一次有限授权最多覆盖20次裁判校准加4组回答/评分，共28次预留；这只是执行规模示例，不授予模型额度。所有步骤经同一共享账本，定时部署保持独立。
+
+校准参考、实际原文、问题、答案、授权、账号摘要和回执仅保存在本地私有目录。公开仓库只包含通用执行代码及合成测试。模型接入不代替检索链路或真实跨库验收。
+
+协议参考：[Codex App Server](https://learn.chatgpt.com/docs/app-server) 的结构化输出、回合完成通知与token用量通知。完成通知和后续本地校验共同决定成功，连接成功或开始流式输出不算答题成功。
+
 新增测试命令：
 
 ```sh
-PYTHONPATH=projects/kb-ingestion-workflow/integrations/kb_custody_v21/src:projects/kb-ingestion-workflow/integrations/kb_custody_v21/tests python -m unittest test_qa_quality test_qa_quality_calls test_qa_regression test_qa_quality_cli
+PYTHONPATH=projects/kb-ingestion-workflow/integrations/kb_custody_v21/src:projects/kb-ingestion-workflow/integrations/kb_custody_v21/tests python -m unittest test_qa_quality test_qa_quality_calls test_qa_regression test_qa_quality_cli test_qa_quality_subscription test_qa_quality_pilot
 ```

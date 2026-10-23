@@ -72,7 +72,7 @@ def main():
     nodes = {}
     for name, tests in (
         ("gateway-mock", ["custody-v21-integration"]),
-        ("pilot-text-client", ["pilot-reading-guide", "pilot-reading-organize", "pilot-knowledge-qa", "codex-app-server-client"]),
+        ("pilot-text-client", ["pilot-reading-guide", "pilot-reading-organize", "pilot-knowledge-qa", "pilot-qa-quality", "codex-app-server-client"]),
         ("v1-pure-logic", ["curation-intent", "content-consent", "message-policy", "user-facing-text",
                            "local-conversion-results", "kb-curation-results", "workflow-v11", "document-reference"]),
     ):

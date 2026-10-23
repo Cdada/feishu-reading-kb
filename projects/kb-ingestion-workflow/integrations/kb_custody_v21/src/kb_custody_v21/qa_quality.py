@@ -110,7 +110,7 @@ def judge_packet(fixture, answer):
     hits = evidence_hits(fixture)
     validate_answer(answer, hits)
     return dict(protocol='qa-quality-judge-v1', instruction=JUDGE_INSTRUCTION,
-        question=deepcopy(fixture['model_input']), evidence=hits,
+        question={k: deepcopy(v) for k, v in fixture['model_input'].items() if k != 'documents'}, evidence=hits,
         reference=deepcopy(fixture['expected']), candidate=deepcopy(answer), rubric=deepcopy(RUBRIC),
         response_contract=dict(scores={k: 'integer 0..4' for k in WEIGHTS},
             reasons={k: 'short evidence-based reason' for k in WEIGHTS},
