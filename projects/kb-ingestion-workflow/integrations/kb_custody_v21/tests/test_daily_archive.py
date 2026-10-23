@@ -98,8 +98,8 @@ class ArchiveTests(unittest.TestCase):
         for text in ('@机器人 归档','@_user_1归档','@_user_1 确认入库','归档 @_user_1','@_user_1 帮我看看'):
             self.assertFalse(archive_command(command(text=text),self.p))
 
-    def test_foreign_edited_or_ambiguous_commands_are_ignored(self):
-        cases=[dict(chat_id='oc_other'),dict(updated=True),dict(deleted=True),dict(mentions=[]),
+    def test_foreign_deleted_or_ambiguous_commands_are_ignored(self):
+        cases=[dict(chat_id='oc_other'),dict(updated='true'),dict(updated=None),dict(deleted=True),dict(mentions=[]),
             dict(sender=dict(id='ou_other',id_type='open_id',sender_type='user')),
             dict(mentions=[dict(id='ou_other',id_type='open_id',key='@_user_1')]),
             dict(mentions=command()['mentions']*2)]
@@ -107,6 +107,25 @@ class ArchiveTests(unittest.TestCase):
             self.assertFalse(archive_command(dict(command(),**change),self.p))
         self.persist(); self.items['om_cmd']['deleted']=True; self.flow.drain()
         self.assertEqual(self.row()['state'],'ignored')
+        self.assertFalse(self.store.rows('SELECT * FROM daily_documents'))
+
+    def test_updated_metadata_does_not_reject_current_exact_archive_command(self):
+        self.items['om_cmd'].update(updated=True,create_time='1000000000',update_time='1000000102')
+        self.persist(); self.flow.drain()
+        self.assertEqual(self.row()['state'],'processed')
+        self.assertEqual(self.store.document('om_file')['phase'],'registered')
+
+    def test_updated_command_with_changed_intent_cannot_register_file(self):
+        self.persist()
+        self.items['om_cmd'].update(updated=True,body=dict(content=encoded(dict(text='@_user_1 取消'))))
+        self.flow.drain()
+        self.assertEqual(self.row()['state'],'ignored')
+        self.assertFalse(self.store.rows('SELECT * FROM daily_documents'))
+
+    def test_updated_original_file_is_still_rejected(self):
+        self.items['om_file']['updated']=True
+        self.persist(); self.flow.drain()
+        self.assertIn('不是可归档文件',self.row()['result'])
         self.assertFalse(self.store.rows('SELECT * FROM daily_documents'))
 
     def test_missing_parent_never_uses_root_or_latest_attachment(self):

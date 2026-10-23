@@ -54,7 +54,9 @@ func archiveNativeCommand(m map[string]any, p pilotSession) bool {
 	body, _ := m["body"].(map[string]any)
 	raw, _ := body["content"].(string)
 	mentions, _ := m["mentions"].([]any)
-	if m["chat_id"] != p.ChatID || m["msg_type"] != "text" || m["deleted"] != false || m["updated"] != false ||
+	// Newly sent mentions can carry updated=true; revalidate their current body.
+	_, updateFlagValid := m["updated"].(bool)
+	if m["chat_id"] != p.ChatID || m["msg_type"] != "text" || m["deleted"] != false || !updateFlagValid ||
 		s["id"] != p.AccountID || s["id_type"] != "open_id" || s["sender_type"] != "user" || len(mentions) != 1 {
 		return false
 	}

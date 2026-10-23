@@ -122,7 +122,7 @@ func TestArchiveEventOnlyGrantsExactCommandRead(t *testing.T) {
 }
 
 func TestArchiveParentAndDownloadRequirePhysicalOwnerCommandAndFile(t *testing.T) {
-	for _, change := range []string{"valid", "wrong-parent", "wrong-owner", "wrong-bot", "edited", "no-journal", "no-file", "wrong-key", "no-profile"} {
+	for _, change := range []string{"valid", "wrong-parent", "wrong-owner", "wrong-bot", "updated", "changed-command", "invalid-update-flag", "no-journal", "no-file", "wrong-key", "no-profile"} {
 		t.Run(change, func(t *testing.T) {
 			c, p := archiveControl(t)
 			item := archiveNative(p)
@@ -133,8 +133,13 @@ func TestArchiveParentAndDownloadRequirePhysicalOwnerCommandAndFile(t *testing.T
 				item["sender"].(map[string]any)["id"] = "ou_other"
 			case "wrong-bot":
 				item["mentions"].([]any)[0].(map[string]any)["id"] = "ou_other"
-			case "edited":
+			case "updated":
 				item["updated"] = true
+			case "changed-command":
+				item["updated"] = true
+				item["body"].(map[string]any)["content"] = `{"text":"@_user_1 取消"}`
+			case "invalid-update-flag":
+				item["updated"] = "true"
 			}
 			archiveReceipt(t, &c, "command", item)
 			if change != "no-file" {
@@ -157,7 +162,7 @@ func TestArchiveParentAndDownloadRequirePhysicalOwnerCommandAndFile(t *testing.T
 			p.Operation = "receive-inbox"
 			p.Limits["download"] = 1
 			p.Inbox = &pilotInboxPolicy{Reference: "P19-inbox-v1", Formats: []string{".md"}, Maximum: 4096, MaxFiles: 1}
-			if knownPilotDownload(c, p) != (change == "valid") {
+			if knownPilotDownload(c, p) != (change == "valid" || change == "updated") {
 				t.Fatal("download binding mismatch", change)
 			}
 		})

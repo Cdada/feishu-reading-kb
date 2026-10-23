@@ -29,9 +29,13 @@ SCHEMA = """CREATE TABLE IF NOT EXISTS daily_archive_inbox(
 
 def archive_command(item, policy):
     """Only a platform-resolved mention, alone or followed by 归档, is intent."""
+    # Feishu can mark a newly sent mention as updated. Authorize the current
+    # physically read command and exact owner/mention, not that metadata flag.
+    # This is only a receipt request; the original file and publication gates
+    # still validate their own immutable inputs and separate owner decision.
     sender = item.get('sender', {})
     if (item.get('chat_id') != policy.chat_id or item.get('msg_type') != 'text'
-            or item.get('deleted') is not False or item.get('updated') is not False
+            or item.get('deleted') is not False or type(item.get('updated')) is not bool
             or (sender.get('id'), sender.get('id_type'), sender.get('sender_type'))
             != (policy.account_id, 'open_id', 'user')):
         return False
