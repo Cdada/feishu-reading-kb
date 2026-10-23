@@ -122,12 +122,15 @@ class RegressionStore:
             results=[dict(id=r['id'], status=r['status']) for r in task['results']])
         if task['state'] not in ('completed', 'partial', 'failed', 'deferred'):
             return None
-        fingerprint = digest(payload)
+        # Compare the latest outcome for this library, not merely this task ID.
+        # Otherwise every unchanged weekly run would produce another notice.
+        stream_key = 'corpus:'+task['plan']['corpus_id']
+        fingerprint = digest({k: v for k, v in payload.items() if k != 'task_key'})
         with self.connection() as db:
             db.execute('BEGIN IMMEDIATE')
-            previous = db.execute('SELECT summary_sha256 FROM qa_regression_notifications WHERE task_key=?', (key,)).fetchone()
+            previous = db.execute('SELECT summary_sha256 FROM qa_regression_notifications WHERE task_key=?', (stream_key,)).fetchone()
             if previous and previous[0] == fingerprint:
                 return None
             db.execute('INSERT INTO qa_regression_notifications VALUES (?,?) ON CONFLICT(task_key) DO UPDATE SET summary_sha256=excluded.summary_sha256',
-                (key, fingerprint))
+                (stream_key, fingerprint))
         return payload

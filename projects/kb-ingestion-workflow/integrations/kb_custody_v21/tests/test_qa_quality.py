@@ -110,6 +110,13 @@ class QualityTests(unittest.TestCase):
         self.g['required'][0]['verdict'] = 'missing'
         self.assertEqual(self.score(calibration_value=calibrated_report())['status'], 'failed')
 
+    def test_low_scores_keep_their_detailed_reason(self):
+        self.g['scores'] = {k: 3 for k in WEIGHTS}
+        result = self.score(calibration_value=calibrated_report())
+        self.assertIn('score_below_threshold', result['reasons'])
+        self.assertEqual(result['dimension_reasons'], self.g['reasons'])
+        self.assertEqual(result['point_checks']['required'], self.g['required'])
+
     def test_false_refusal_fails_even_with_inflated_judge_scores(self):
         self.a = dict(status='not_found', claims=[], gaps=['Cannot determine anything.'])
         self.g['claims'] = []

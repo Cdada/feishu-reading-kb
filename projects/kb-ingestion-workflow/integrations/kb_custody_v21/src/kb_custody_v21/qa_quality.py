@@ -209,6 +209,9 @@ def assess(fixture, answer, judgment=None, *, judge_fingerprint, corpus_id, cali
     grade = validate_grade(judgment['grade'], fixture, answer)
     result['score'] = sum(WEIGHTS[k]*grade['scores'][k]/4 for k in WEIGHTS)
     result['dimensions'] = deepcopy(grade['scores'])
+    result['dimension_reasons'] = deepcopy(grade['reasons'])
+    result['point_checks'] = {k: deepcopy(grade[k]) for k in ('required', 'forbidden', 'claims')}
+    result['critical_details'] = deepcopy(grade['critical_errors'])
     result['semantic_calibrated'] = calibrated(calibration_report, judge_fingerprint, corpus_id)
     result['critical_errors'] = [e['code'] for e in grade['critical_errors']]
     if any(r['verdict'] == 'present' for r in grade['forbidden']):
@@ -222,7 +225,9 @@ def assess(fixture, answer, judgment=None, *, judge_fingerprint, corpus_id, cali
     uncertain = any(r['verdict'] == 'uncertain' for field in ('required', 'forbidden', 'claims') for r in grade[field])
     if result['critical_errors'] or result['false_refusal'] or incomplete or result['score'] < RUBRIC['threshold']:
         result['status'] = 'failed'
-        result['reasons'] = (['false_refusal'] if result['false_refusal'] else []) + (['required_points_incomplete'] if incomplete else [])
+        result['reasons'] = ((['false_refusal'] if result['false_refusal'] else [])
+            + (['required_points_incomplete'] if incomplete else [])
+            + (['score_below_threshold'] if result['score'] < RUBRIC['threshold'] else []))
     elif uncertain or not result['semantic_calibrated']:
         result['reasons'] = (['uncertain_judgment'] if uncertain else []) + (['judge_not_calibrated'] if not result['semantic_calibrated'] else [])
     else:

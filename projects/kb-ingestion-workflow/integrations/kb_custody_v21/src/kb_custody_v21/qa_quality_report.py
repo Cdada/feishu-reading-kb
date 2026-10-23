@@ -208,9 +208,17 @@ def markdown_report(report, comparison=None):
         '| 题目 | 状态 | 得分 | 原因 |', '| --- | --- | ---: | --- |']
     def cell(value):
         return str(value).replace('|', '\\|').replace('\n', ' ').replace('<', '&lt;').replace('>', '&gt;')
+    labels = dict(passed='通过', failed='未通过', needs_review='待复核', not_run='未测试',
+        skipped='跳过', unknown='调用结果不明', error='执行错误')
+    reasons = dict(answer_missing='尚无答卷', semantic_judgment_missing='尚无语义评分',
+        judge_not_calibrated='裁判尚未校准', uncertain_judgment='裁判判断不确定',
+        false_refusal='有证据却拒答', required_points_incomplete='必答内容不完整',
+        score_below_threshold='分数低于门槛', invalid_answer_or_quote='回答或引用校验未通过',
+        unsupported_claim='存在无依据的主张', forbidden_conclusion='出现禁止结论')
     for row in report['results']:
-        lines.append('| '+ ' | '.join(map(cell, [row['id'], row['status'], row['score'] if row['score'] is not None else '未评分',
-            ', '.join(row.get('critical_errors', [])+row.get('reasons', []))]))+' |')
+        codes = row.get('critical_errors', [])+row.get('reasons', [])
+        lines.append('| '+ ' | '.join(map(cell, [row['id'], labels[row['status']], row['score'] if row['score'] is not None else '未评分',
+            '；'.join(reasons.get(code, code) for code in codes)]))+' |')
     if comparison is not None:
         lines += ['', '## 与基线比较', '', f"状态：{comparison['status']}；建议放行：{comparison['release_allowed']}。",
             '该报告不自动部署、回退或启动服务。']

@@ -195,6 +195,14 @@ class RegressionStoreTests(unittest.TestCase):
         self.assertEqual(self.store.notification(self.key)['state'], 'completed')
         self.assertIsNone(self.store.notification(self.key))
 
+    def test_unchanged_outcomes_across_new_tasks_stay_quiet(self):
+        self.store.run(self.key, self.ok)
+        self.assertIsNotNone(self.store.notification(self.key))
+        next_plan = plan(cases=[fixture(), fixture('second')], system_fingerprint='f'*64)
+        key = self.store.enqueue(next_plan)
+        self.store.run(key, self.ok)
+        self.assertIsNone(self.store.notification(key))
+
 
 if __name__ == '__main__':
     unittest.main()
