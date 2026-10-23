@@ -43,11 +43,31 @@ def make_report(cases, records, run, *, calibration_report=None):
         require(record.get('state') in ('completed', 'error', 'skipped', 'unknown'), 'explicit result state required')
         require(type(record.get('model_calls')) is int and record['model_calls'] >= 0
             and type(record.get('cached')) is bool, 'actual call count and cache status required')
+        require(all(type(record[k]) is bool for k in ('answer_cached', 'judge_cached') if k in record), 'cache observations must be boolean')
         if record['state'] != 'completed':
             require(text(record.get('reason')) and not record.get('answer') and not record.get('judgment'), 'unfinished result must explain absence')
         else:
             require('answer' in record, 'completed result lacks an answer')
+        if 'provider_models' in record:
+            require(isinstance(record['provider_models'], dict) and set(record['provider_models']) == {'answer', 'judge'}
+                and all(map(text, record['provider_models'].values())), 'explicit observed model identities required')
         by_record[record['id']] = record
+    token_totals = dict(input_tokens_known=0, output_tokens_known=0, calls_with_unknown_usage=0)
+    for record in records:
+        known_calls = 0
+        usage = record.get('usage', {})
+        require(isinstance(usage, dict) and set(usage) <= {'answer', 'judge'}, 'invalid token usage roles')
+        for role, amounts in usage.items():
+            require(isinstance(amounts, dict) and set(amounts) == {'input_tokens', 'output_tokens'}
+                and all(v is None or type(v) is int and v >= 0 for v in amounts.values()), 'invalid token usage')
+            if record.get(role+'_cached', record['cached']):
+                continue
+            known_calls += int(all(v is not None for v in amounts.values()))
+            for token, count in amounts.items():
+                if count is not None:
+                    token_totals[token+'_known'] += count
+        require(known_calls <= record['model_calls'], 'token receipts exceed actual new calls')
+        token_totals['calls_with_unknown_usage'] += record['model_calls']-known_calls
     rows = []
     for case in cases:
         record = by_record.get(case['id'])
@@ -65,7 +85,8 @@ def make_report(cases, records, run, *, calibration_report=None):
             result = assess(case, record['answer'], record.get('judgment'),
                 judge_fingerprint=run['judge_fingerprint'], corpus_id=run['corpus_id'], calibration_report=calibration_report)
             rows.append(dict(base, **{k: v for k, v in result.items() if k not in base},
-                cached=record['cached'], model_calls=record['model_calls']))
+                cached=record['cached'], model_calls=record['model_calls'],
+                provider_models=deepcopy(record.get('provider_models'))))
     slices = {}
     for field in ('question_type', 'answerability', 'split'):
         groups = defaultdict(list)
@@ -77,6 +98,7 @@ def make_report(cases, records, run, *, calibration_report=None):
         calibration_sha256=digest(calibration_report) if calibration_report else None,
         summary=summary(rows), slices=slices, results=rows,
         model_calls=sum(r['model_calls'] for r in rows), cached_cases=sum(r['cached'] for r in rows),
+        token_usage=token_totals,
         limitation='Scores describe supplied evidence only; uncalibrated scores are provisional. Missing results never pass.')
     result['report_sha256'] = digest(result)
     return result
@@ -102,6 +124,15 @@ def compare_reports(baseline, candidate, *, mode='system'):
     if mode == 'prompt':
         same += ['model', 'parameters_sha256', 'code_commit']
     mismatches += [k for k in same if baseline['run'][k] != candidate['run'][k]]
+    if baseline['case_set_sha256'] == candidate['case_set_sha256']:
+        before_rows = {r['id']: r for r in baseline['results']}
+        for row in candidate['results']:
+            old_models, new_models = before_rows[row['id']].get('provider_models'), row.get('provider_models')
+            if old_models is not None and new_models is not None:
+                if old_models['judge'] != new_models['judge'] or (mode == 'prompt' and old_models['answer'] != new_models['answer']):
+                    mismatches.append('observed_model_revision:'+row['id'])
+            elif (old_models is None) != (new_models is None):
+                mismatches.append('observed_model_identity_missing:'+row['id'])
     if mismatches:
         return dict(status='not_comparable', mismatches=mismatches, release_allowed=False, changes=[])
     old = {r['id']: r for r in baseline['results']}

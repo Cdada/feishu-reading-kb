@@ -7,6 +7,7 @@ import re
 from .contracts import ContractError
 from .qa_answer_contract import INSTRUCTION, validate as validate_answer
 from .qa_test_fixtures import ANSWERABILITY
+from .qa_test_design import ROLES
 
 WEIGHTS = dict(factual=35, evidence=25, coverage=20, boundaries=10, usability=10)
 RUBRIC = dict(version='qa-quality-v1', weights=WEIGHTS, threshold=85,
@@ -62,7 +63,7 @@ def verify_fixture(fixture):
         require(isinstance(doc, dict) and set(doc) == {'material_id', 'title', 'source_role', 'start', 'end', 'text'},
             'invalid evidence document')
         require(text(doc['material_id']) and doc['material_id'] in bindings
-            and text(doc['title']) and text(doc['source_role']) and text(doc['text'])
+            and text(doc['title']) and isinstance(doc['source_role'], str) and doc['source_role'] in ROLES and text(doc['text'])
             and type(doc['start']) is int and type(doc['end']) is int
             and 0 <= doc['start'] < doc['end'] and doc['end']-doc['start'] == len(doc['text']), 'invalid frozen span')
         key = doc['material_id'], doc['start'], doc['end']

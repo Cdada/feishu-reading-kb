@@ -197,6 +197,19 @@ class ReportsTests(unittest.TestCase):
         self.assertEqual(compare_reports(baseline, candidate, mode='prompt')['status'], 'not_comparable')
         self.assertTrue(compare_reports(baseline, candidate, mode='system')['release_allowed'])
 
+    def test_observed_provider_revision_change_blocks_prompt_comparison(self):
+        f = fixture(); first, second = record(f), record(f)
+        first['provider_models'] = dict(answer='revision-one', judge='judge-one')
+        second['provider_models'] = dict(answer='revision-two', judge='judge-one')
+        self.assertEqual(compare_reports(self.report([f], [first]), self.report([f], [second]), mode='prompt')['status'], 'not_comparable')
+
+    def test_token_usage_reports_unknown_and_does_not_rebill_cached(self):
+        f = fixture(); r = record(f)
+        r.update(model_calls=1, cached=True, answer_cached=True, judge_cached=False,
+            usage=dict(answer=dict(input_tokens=99, output_tokens=99), judge=dict(input_tokens=10, output_tokens=None)))
+        usage = self.report([f], [r])['token_usage']
+        self.assertEqual(usage, dict(input_tokens_known=10, output_tokens_known=0, calls_with_unknown_usage=1))
+
     def test_new_critical_failure_is_not_hidden_by_averages(self):
         f = fixture(); bad = grade(); bad['forbidden'][0]['verdict'] = 'present'
         candidate = self.report([f], [record(f, g=bad)])
