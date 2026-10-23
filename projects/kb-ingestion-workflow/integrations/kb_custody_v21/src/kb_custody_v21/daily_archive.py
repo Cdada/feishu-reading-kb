@@ -147,6 +147,12 @@ class ArchiveMentions:
                     text = '这篇资料已入库，沿用现有记录；后续整理如未完成会继续。'
                 elif phase == 'duplicate':
                     text = '已有相同原件的处理记录，本次不会重复生成导读。'
+                elif phase == 'needs_upload':
+                    text = '这篇资料需要补传原件。请发送新的完整附件，再直接回复新附件并 @；旧记录不会重新开始。'
+                elif phase == 'confirmed':
+                    text = '你已确认这篇导读入库，正在等待完成写入与后续整理，无需重复确认。'
+                elif phase in ('model_unknown', 'send_unknown'):
+                    text = '已有处理记录，上次生成或发送的结果尚待核查；此次 @ 不会重新生成导读。'
                 elif phase in ('held', 'rejected'):
                     text = '这篇资料已暂停或暂不入库；本次 @ 不会重新生成，请由 Codex 核查原记录。'
                 elif phase in ('awaiting_confirmation', 'awaiting_images'):

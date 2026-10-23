@@ -146,6 +146,20 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual(self.store.document('om_file')['phase'],'notified')
         self.assertIn('已入库',self.row('om_again')['result'])
 
+    def test_existing_wait_states_are_reported_without_rearming_them(self):
+        self.persist(); self.flow.drain()
+        cases={'needs_upload':'需要补传原件','confirmed':'无需重复确认',
+               'model_unknown':'结果尚待核查','send_unknown':'结果尚待核查'}
+        for phase,expected in cases.items():
+            with self.subTest(phase=phase):
+                with self.store.transaction() as db:
+                    db.execute('UPDATE daily_documents SET phase=? WHERE message_id=?',(phase,'om_file'))
+                mid='om_'+phase
+                self.items[mid]=command(phase)
+                self.persist(mid,'event_'+phase); self.flow.drain()
+                self.assertEqual(self.store.document('om_file')['phase'],phase)
+                self.assertIn(expected,self.row(mid)['result'])
+
     def test_full_queue_preserves_request_and_resumes_after_space_is_available(self):
         with self.store.transaction() as db:
             for n in range(self.p.max_pending): self.store._observe(db,message(n))
