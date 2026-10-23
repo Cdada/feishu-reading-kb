@@ -158,7 +158,13 @@ class CardListener:
         if kind=='event':
             if not self._ready.is_set() or not isinstance(value.get('event'),dict):
                 raise ContractError('callback from a listener that is not ready')
-            self.ingress.persist(value['event'],app_id=value.get('app_id'),session_path=self.session_path)
+            event = value['event']
+            if event.get('type') == 'im.message.receive_v1':
+                if b.archive_mentions is None:
+                    raise ContractError('archive mention listener is disabled')
+                b.archive_mentions.persist(event, app_id=value.get('app_id'), session_path=self.session_path)
+            else:
+                self.ingress.persist(event,app_id=value.get('app_id'),session_path=self.session_path)
             return
         raise ContractError('unknown listener protocol message')
 

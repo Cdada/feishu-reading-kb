@@ -21,7 +21,8 @@ COMMANDS = {
 COMMANDS.update(RELATION_COMMANDS)
 from .qa_cards import COMMANDS as QA_COMMANDS, HEADER as QA_HEADER, checked_fields as qa_fields, commands as qa_commands
 COMMANDS['qa'] = QA_COMMANDS
-HEADERS = dict(HEADERS, qa=QA_HEADER)
+COMMANDS['archive_status'] = ()
+HEADERS = dict(HEADERS, qa=QA_HEADER, archive_status='归档收件状态')
 
 
 def commands(binding):
@@ -78,6 +79,14 @@ def _digest(value):
 def checked_binding(binding):
     if not isinstance(binding, dict) or binding.get('purpose') not in COMMANDS:
         raise ContractError('supported card purpose required')
+    if binding['purpose'] == 'archive_status':
+        if (set(binding) != {'purpose','document_id','source_sha256','target_message_id','details'}
+                or not isinstance(binding['details'], str) or not 0 < len(binding['details'].encode()) <= 2048
+                or binding['document_id'] != binding['target_message_id']):
+            raise ContractError('exact archive status binding required')
+        _identity(binding['document_id'], 'om_')
+        _digest(binding['source_sha256'])
+        return dict(binding)
     if binding['purpose'] in RELATION_COMMANDS:
         checked_fields(binding)
         _identity(binding['document_id'], 'om_')
@@ -115,7 +124,7 @@ def render_card(card, *, result=None):
     title = card['title']
     if not isinstance(title, str) or not title.strip() or len(title.encode()) > 1024:
         raise ContractError('bounded nonempty card title required')
-    if binding['purpose'] in RELATION_COMMANDS or binding['purpose'] == 'qa':
+    if binding['purpose'] in RELATION_COMMANDS or binding['purpose'] in ('qa', 'archive_status'):
         detail = binding['details']
     elif binding['purpose'] == 'preview':
         detail = f"导读第 {binding['preview_version']} 版。请先查看本卡片所回复的导读 PDF，再选择。"

@@ -48,6 +48,10 @@ class DailyBackend:
             from .daily_card_events import CardListener
             self.card_flow = CardFlow(self)
             self.card_listener = CardListener(self)
+        self.archive_mentions = None
+        if 'archive_mentions' in authority.config:
+            from .daily_archive import ArchiveMentions
+            self.archive_mentions = ArchiveMentions(self)
         self.reading_flow = None
         if getattr(authority, 'reading', None) is not None:
             from .reading_flow import ReadingFlow
@@ -219,7 +223,7 @@ class DailyBackend:
         if self.qa is not None:
             self.qa.report()
 
-    def collect(self):
+    def process_events(self):
         if self.card_listener is not None:
             try:
                 try:
@@ -235,7 +239,16 @@ class DailyBackend:
                 self.store.put('card_listener_wait', dict(reason=error.reason, until=error.until))
             else:
                 self.store.put('card_listener_wait', None)
+        if self.archive_mentions is not None:
+            self.archive_mentions.drain()
+
+    def collect(self):
+        # Direct collector callers retain callback upkeep as well.
+        self.process_events()
         result = self.collector.collect()
+        if self.archive_mentions is not None:
+            self.archive_mentions.collect()
+            self.archive_mentions.drain()
         if self.qa is not None:
             self.qa.collect()
         return result

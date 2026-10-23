@@ -41,6 +41,7 @@ type eventReply struct {
 type eventGate struct {
 	base        *Guard
 	chat, owner string
+	bot         string
 	ctx         context.Context
 	cancel      context.CancelFunc
 	output      io.Writer
@@ -246,6 +247,7 @@ func runCardListener(path, digest string) int {
 			App   string `json:"app_id"`
 			Chat  string `json:"chat_id"`
 			Owner string `json:"account_id"`
+			Bot   string `json:"bot_id"`
 		} `json:"policy"`
 	}
 	if base.check() != nil || !cardEnabled(c, c.Session) || !frozenJSON(c, c.Session, &rules) || rules.Reference != "P32-standing-v1" || !rules.Approved ||
@@ -260,7 +262,7 @@ func runCardListener(path, digest string) int {
 	marker.Close()
 	ctx, cancel := context.WithDeadline(context.Background(), c.ExpiresAt)
 	defer cancel()
-	g := &eventGate{base: base, ctx: ctx, cancel: cancel, input: make(chan eventReply), chat: rules.Policy.Chat, owner: rules.Policy.Owner}
+	g := &eventGate{base: base, ctx: ctx, cancel: cancel, input: make(chan eventReply), chat: rules.Policy.Chat, owner: rules.Policy.Owner, bot: rules.Policy.Bot}
 	go func() {
 		scanner := bufio.NewScanner(os.Stdin)
 		scanner.Buffer(make([]byte, 4096), 65536)
@@ -299,6 +301,9 @@ func runCardListener(path, digest string) int {
 	}
 	websocket.DefaultDialer = g.dialer(websocket.DefaultDialer)
 	handler := dispatcher.NewEventDispatcher("", "").OnP2CardActionTrigger(g.handle)
+	if archiveMentionEnabled(c, c.Session) {
+		handler.OnP2MessageReceiveV1(g.handleArchiveMessage)
+	}
 	client := larkws.NewClient(cfg.AppID, cfg.AppSecret, larkws.WithEventHandler(handler), larkws.WithAutoReconnect(false), larkws.WithLogger(g))
 	go func() {
 		if client.Start(ctx) != nil {

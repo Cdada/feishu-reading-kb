@@ -71,6 +71,11 @@ func validPilotDownloadBinding(c Control, p pilotSession) bool {
 	if !allowed {
 		return false
 	}
+	// Event-triggered intake still requires the independently read native file
+	// in knownPilotDownload; a verified owner reply only grants its exact parent.
+	if p.Daily != nil && knownArchiveParent(c, p, d.MessageID) {
+		return true
+	}
 	// V1 only admits a complete single-page scan. A truncated page cannot be
 	// treated as a complete batch or grant downloads for the visible subset.
 	for path, digest := range c.Frozen {

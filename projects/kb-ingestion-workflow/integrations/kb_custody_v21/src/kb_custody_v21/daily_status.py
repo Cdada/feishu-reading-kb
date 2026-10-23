@@ -26,6 +26,11 @@ def local_status(root):
             pending_notifications=sum(r['phase']=='published' for r in rows),
             model_turns=db.execute('SELECT count(*) FROM daily_models').fetchone()[0],
             history_gaps=[dict(r) for r in db.execute('SELECT channel,gap_start,gap_end FROM daily_scans WHERE gap_start IS NOT NULL')])
+        if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='daily_archive_inbox'").fetchone():
+            counts={r['state']:r['n'] for r in db.execute('SELECT state,count(*) AS n FROM daily_archive_inbox GROUP BY state')}
+            summary['archive_mentions']=dict(pending=counts.get('pending',0)+counts.get('responding',0),
+                held=counts.get('held',0), listener=meta.get('card_listener_status'),
+                last_problem=meta.get('archive-mention-problem'))
         tasks=[v for k,v in meta.items() if k.startswith('relation-task:') and isinstance(v,dict)]
         if tasks:
             summary['relations']=dict(
@@ -82,6 +87,11 @@ def user_summary(value, *, max_items=None):
         lines.append('关联待选择：'+str(relations['waiting'])+' 项；这些资料均已完成入库。')
     if relations.get('blocked') or relations.get('write_pending'):
         lines.append('有资料关联需要核查或恢复；其他资料可继续归档。')
+    mentions=summary.get('archive_mentions',{})
+    if mentions.get('pending'):
+        lines.append('@归档请求待处理：'+str(mentions['pending'])+' 条；记录已保留。')
+    if mentions.get('held'):
+        lines.append('@归档请求需核查：'+str(mentions['held'])+' 条，请由 Codex 查看具体原因。')
     if value.get('network_pause'):
         lines.append('网络入口已暂停；已登记材料和确认记录保留。')
     if value.get('collection_wait'):

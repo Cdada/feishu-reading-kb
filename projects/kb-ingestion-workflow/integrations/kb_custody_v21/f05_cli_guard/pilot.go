@@ -313,7 +313,7 @@ func pilotPath(c Control, p pilotSession) bool {
 // An exact-ID read must originate in a successful, hash-bound list response from
 // the fixed group and person. Caller-supplied IDs alone are not sufficient.
 func knownPilotMessage(c Control, p pilotSession, id string) bool {
-	if knownDailyBotMessage(c, p, id) {
+	if knownDailyBotMessage(c, p, id) || knownArchiveMessage(c, p, id) || knownArchiveParent(c, p, id) {
 		return true
 	}
 	for path, digest := range c.Frozen {

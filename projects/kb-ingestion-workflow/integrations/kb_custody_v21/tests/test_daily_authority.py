@@ -40,6 +40,16 @@ class AuthorityTests(unittest.TestCase):
         self.path.write_text(json.dumps(self.value))
         return file_sha(self.path)
 
+    def test_archive_mentions_require_explicit_profile_and_cards(self):
+        self.value['archive_mentions'] = dict(reference='P46-archive-mention-v1', enabled=True)
+        with self.assertRaisesRegex(ContractError, 'archive mention profile'):
+            DailyAuthority(self.path, self.save())
+        self.value['cards'] = dict(reference='P40-cards-v1', enabled=True)
+        self.assertIsNotNone(DailyAuthority(self.path, self.save()))
+        self.value['archive_mentions']['enabled'] = False
+        with self.assertRaisesRegex(ContractError, 'archive mention profile'):
+            DailyAuthority(self.path, self.save())
+
     def test_unapproved_template_cannot_create_live_authority(self):
         self.value['approved']=False
         with self.assertRaisesRegex(ContractError,'not been approved'):DailyAuthority(self.path,self.save())

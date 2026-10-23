@@ -47,6 +47,10 @@ func cardBinding(v *dailyCard) bool {
 	if relationPurpose(purpose) {
 		return relationBinding(b)
 	}
+	if purpose == "archive_status" {
+		details, _ := b["details"].(string)
+		return len(b) == 5 && doc == parent && len(details) > 0 && len(details) <= 2048
+	}
 	if purpose == "qa" {
 		job, _ := b["job_id"].(string)
 		details, _ := b["details"].(string)
@@ -92,6 +96,9 @@ func cardJSON(v *dailyCard) map[string]any {
 			commands = []string{"按发表时间", "按内容时间", "按入库时间"}
 		}
 	}
+	if b["purpose"] == "archive_status" {
+		title, detail, commands = "归档收件状态", b["details"].(string), nil
+	}
 	t := plainCardText(v.Title)
 	t["text_size"] = "heading-3"
 	elems := []any{map[string]any{"tag": "div", "text": t}, map[string]any{"tag": "div", "text": plainCardText(detail)}}
@@ -118,6 +125,9 @@ func dailyCardPath(c Control, p pilotSession) bool {
 		!cardEnabled(c, p.Daily.Rules) || !cardBinding(v) || len(v.Content) > 32768 || len(v.Result) > 2048 {
 		return false
 	}
+	if v.Binding["purpose"] == "archive_status" && !archiveMentionEnabled(c, p.Daily.Rules) {
+		return false
+	}
 	if relationPurpose(v.Binding["purpose"]) {
 		if !relationEnabled(c, p.Daily.Rules) {
 			return false
@@ -142,6 +152,9 @@ func dailyCardPath(c Control, p pilotSession) bool {
 	parent := v.Binding["target_message_id"].(string)
 	targetOK := false
 	for _, m := range dailyReceiptMessages(c, p, v.Target) {
+		if v.Binding["purpose"] == "archive_status" && m["message_id"] == parent && archiveNativeCommand(m, p) {
+			targetOK = true
+		}
 		if m["message_id"] == parent && dailyBotMessage(m, p) &&
 			((v.Binding["purpose"] == "preview" || relationPurpose(v.Binding["purpose"])) && m["msg_type"] == "file" || (v.Binding["purpose"] == "images" || v.Binding["purpose"] == "qa") && m["msg_type"] == "text") {
 			targetOK = true

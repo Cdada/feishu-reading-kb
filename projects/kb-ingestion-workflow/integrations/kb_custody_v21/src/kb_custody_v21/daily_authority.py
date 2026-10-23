@@ -40,6 +40,11 @@ class DailyAuthority:
             required.add('qa')
         if 'pdf' in c:
             required.add('pdf')
+        if 'archive_mentions' in c:
+            from .daily_archive import PROFILE
+            required.add('archive_mentions')
+            if c['archive_mentions'] != PROFILE or 'cards' not in c:
+                raise ContractError('explicit archive mention profile with cards required')
         if 'cards' in c:
             required.add('cards')
             if c['cards'] != dict(reference='P40-cards-v1', enabled=True):

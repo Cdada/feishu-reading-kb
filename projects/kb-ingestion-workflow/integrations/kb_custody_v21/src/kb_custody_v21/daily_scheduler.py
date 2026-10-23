@@ -115,6 +115,17 @@ class DailyScheduler:
             self.stop.set()
             self._heartbeat('stopping', heavy_active=self.future is not None)
             return False
+        # Event intake runs every scheduler turn, independently of history polls
+        # and the one heavy worker. Only persisted, due requests use the network.
+        process_events = getattr(self.adapter, 'process_events', None)
+        waiting = self.store.get('events_wait') or {}
+        if process_events is not None and waiting.get('until', 0) <= self.store.now():
+            try:
+                process_events()
+            except (Deferred, StorageUnavailable) as error:
+                self.store.put('events_wait', dict(reason=str(error), until=getattr(error, 'until', None) or self.store.now()+self.store.policy.poll_seconds))
+            else:
+                self.store.put('events_wait', None)
         current = self.monotonic()
         if self.last_poll is None or current-self.last_poll >= self.store.policy.poll_seconds:
             try:
