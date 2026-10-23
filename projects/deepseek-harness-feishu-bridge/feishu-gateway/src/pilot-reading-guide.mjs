@@ -69,7 +69,7 @@ export function checkSubscription(account, limits, expectedAccountSha, minimumRe
   return { accountType: 'chatgpt', planType: a.planType, paidCreditsAvailable: false };
 }
 
-async function boundFile(path, expected, retainBytes = true) {
+export async function boundFile(path, expected, retainBytes = true) {
   const stat = await lstat(path);
   if (!stat.isFile() || stat.isSymbolicLink() || await realpath(path) !== resolve(path)
       || stat.size > (retainBytes ? 32 : 1024) * 1024 * 1024) reject();
@@ -86,6 +86,20 @@ async function boundFile(path, expected, retainBytes = true) {
   return data;
 }
 
+export async function standingReserve(path, expected, now = () => Date.now()) {
+  const rules = JSON.parse(await boundFile(path, expected));
+  const p = rules.policy;
+  if (rules.approved !== true || p?.model_budget_mode !== 'standing_daily'
+      || p.model_turn_limit !== null || p.paid_model_cny !== 0) reject();
+  const percent = p.temporary_reserve_percent, until = p.temporary_reserve_until;
+  if (percent != null || until != null) {
+    if (!Number.isInteger(percent) || percent < 1 || percent >= 5
+        || !Number.isFinite(until) || until <= 0) reject();
+    if (now() < until * 1000) return percent;
+  }
+  return 5;
+}
+
 export function makeAccessCheck(binding, now = () => Date.now()) {
   return async () => {
     const window = () => {
@@ -98,7 +112,11 @@ export function makeAccessCheck(binding, now = () => Date.now()) {
         || approval.starts_at !== binding.startsAt || approval.expires_at !== binding.expiresAt
         || approval.account_sha256 !== binding.accountSha
         || !approval.request_sha256.includes(binding.requestSha)) reject();
-    const minimumRemainingPercent = Object.hasOwn(approval, 'minimum_remaining_percent') ? approval.minimum_remaining_percent : 5;
+    let minimumRemainingPercent = Object.hasOwn(approval, 'minimum_remaining_percent') ? approval.minimum_remaining_percent : 5;
+    if (binding.dailyRulesPath != null) {
+      if (binding.files?.[binding.dailyRulesPath] !== binding.dailyRulesSha) reject();
+      minimumRemainingPercent = await standingReserve(binding.dailyRulesPath, binding.dailyRulesSha, now);
+    }
     if (!Number.isInteger(minimumRemainingPercent) || minimumRemainingPercent < 0 || minimumRemainingPercent >= 100) reject();
     if (!binding.files || Object.keys(binding.files).length === 0) reject();
     for (const [path, hash] of Object.entries(binding.files)) await boundFile(path, hash, false);
@@ -158,6 +176,7 @@ export async function runText(packet, { client, check, outputSchema = guideSchem
     checkpoint = 'thread_setup';
     const thread = await client.ensureThread();
     await verify();
+    checkSubscription(account, limits, packet.binding.accountSha, minimumRemainingPercent);
     stage = 'generation'; // No later failure permits an automatic new turn.
     checkpoint = 'generation';
     const answer = await client.prompt(thread, packet.request, {

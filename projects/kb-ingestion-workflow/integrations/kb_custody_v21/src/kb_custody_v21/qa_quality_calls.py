@@ -80,7 +80,7 @@ class EvaluationCalls:
             require(saved is None or saved[0] == digest(grant), 'evaluation grant id cannot change scope or allowance')
             if db.execute('SELECT count(*) FROM qa_eval_calls WHERE grant_id=?', (grant['id'],)).fetchone()[0] >= grant['max_calls']:
                 raise Deferred('evaluation_grant_limit')
-            if db.execute('SELECT count(*) FROM daily_models').fetchone()[0] >= self.daily.policy.model_turn_limit:
+            if self.daily.policy.model_limit_reached(db.execute('SELECT count(*) FROM daily_models').fetchone()[0]):
                 raise Deferred('model_limit')
             db.execute('INSERT OR IGNORE INTO qa_eval_grants VALUES (?,?)', (grant['id'], digest(grant)))
             proof = dict(purpose='qa_evaluation_'+purpose, run_id=run_id, case_id=case_id,

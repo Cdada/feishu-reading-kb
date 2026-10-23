@@ -2,6 +2,7 @@
 from dataclasses import asdict, dataclass
 import hashlib
 import re
+import math
 
 from .contracts import ContractError
 from .registry import encoded
@@ -13,9 +14,9 @@ class DailyPolicy:
     chat_id: str
     account_id: str
     bot_id: str
-    # A cumulative ceiling is deliberate: restarting or a date boundary cannot
-    # grant another model turn. An explicit policy update may add allowance.
-    model_turn_limit: int
+    # Legacy finite grants retain their cumulative ceiling. Standing daily use
+    # requires an explicit mode plus null ceiling; history is never discarded.
+    model_turn_limit: int | None
     poll_seconds: int = 20
     http_per_minute: int = 60
     http_per_day: int = 20000
@@ -28,6 +29,21 @@ class DailyPolicy:
     max_pending: int = 500
     max_asset_bytes: int = 32 * 1024 * 1024
     paid_model_cny: int = 0
+    model_budget_mode: str = 'cumulative'
+    temporary_reserve_percent: int | None = None
+    temporary_reserve_until: float | None = None
+
+    @property
+    def standing_daily(self):
+        return self.model_budget_mode == 'standing_daily'
+
+    def model_limit_reached(self, count):
+        return not self.standing_daily and count >= self.model_turn_limit
+
+    def remaining_reserve(self, now):
+        if self.temporary_reserve_until is not None and now < self.temporary_reserve_until:
+            return self.temporary_reserve_percent
+        return 5
 
     def __post_init__(self):
         for name, prefix in [('app_id', 'cli_'), ('chat_id', 'oc_'),
@@ -35,7 +51,19 @@ class DailyPolicy:
             if not isinstance(getattr(self, name), str) or not re.fullmatch(
                     prefix + r'[A-Za-z0-9_-]+', getattr(self, name)):
                 raise ContractError('daily policy requires explicit identity: ' + name)
-        bounds = dict(model_turn_limit=(0, 10000), poll_seconds=(15, 300),
+        if self.model_budget_mode not in ('cumulative', 'standing_daily'):
+            raise ContractError('explicit supported model budget mode required')
+        if self.standing_daily:
+            if self.model_turn_limit is not None:
+                raise ContractError('standing daily policy requires a null cumulative ceiling')
+        elif type(self.model_turn_limit) is not int or not 0 <= self.model_turn_limit <= 10000:
+            raise ContractError('daily policy limit outside supported range: model_turn_limit')
+        temporary = (self.temporary_reserve_percent, self.temporary_reserve_until)
+        if temporary != (None, None):
+            if (not self.standing_daily or type(temporary[0]) is not int or not 1 <= temporary[0] < 5
+                    or type(temporary[1]) not in (int, float) or not math.isfinite(temporary[1]) or temporary[1] <= 0):
+                raise ContractError('temporary reserve requires an explicit percentage and expiry')
+        bounds = dict(poll_seconds=(15, 300),
                       http_per_minute=(10, 60), http_per_day=(1000, 20000),
                       http_confirmation_reserve=(20, 1000), page_size=(1, 50),
                       pages_per_tick=(1, 10), history_seconds=(60, 7 * 86400),
@@ -55,7 +83,11 @@ class DailyPolicy:
 
     @property
     def digest(self):
-        return hashlib.sha256(encoded(asdict(self)).encode()).hexdigest()
+        value = asdict(self)
+        if not self.standing_daily:
+            for key in ('model_budget_mode', 'temporary_reserve_percent', 'temporary_reserve_until'):
+                value.pop(key)  # Keep existing finite grants bound to their old digest.
+        return hashlib.sha256(encoded(value).encode()).hexdigest()
 
     def retry_delay(self, attempt, retry_after=None):
         if type(attempt) is not int or not 1 <= attempt <= self.retry_attempts:

@@ -113,7 +113,7 @@ class QAStore:
                 raise ContractError('只有正在处理的问题可使用模型。')
             if db.execute('SELECT 1 FROM qa_calls WHERE job_id=?', (key,)).fetchone():
                 raise Deferred('qa_model_already_reserved')
-            if db.execute('SELECT count(*) FROM daily_models').fetchone()[0] >= self.daily.policy.model_turn_limit:
+            if self.daily.policy.model_limit_reached(db.execute('SELECT count(*) FROM daily_models').fetchone()[0]):
                 raise Deferred('model_limit')
             model_key = stable_key('P43-qa-model', key)
             checked_access()

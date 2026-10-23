@@ -179,7 +179,7 @@ class ReadingStore:
                           (material_id, purpose_key)).fetchone():
                 raise Deferred('reading_call_already_reserved')
             # Same table/count as the existing guide calls. No per-phase reset.
-            if db.execute('SELECT count(*) FROM daily_models').fetchone()[0] >= self.store.policy.model_turn_limit:
+            if self.store.policy.model_limit_reached(db.execute('SELECT count(*) FROM daily_models').fetchone()[0]):
                 raise Deferred('model_limit')
             key = stable_key('P41-reading-model', material_id, purpose_key)
             evidence = dict(purpose='reading_'+purpose, material_id=material_id,

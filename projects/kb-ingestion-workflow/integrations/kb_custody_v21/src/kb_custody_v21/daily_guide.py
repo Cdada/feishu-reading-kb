@@ -135,14 +135,17 @@ def generate_daily_guide(authority, store, pipeline, entry_id, attempt, *, wire=
 
 class DailyTextWire(CodexTextWire):
     """Stop only our own client process group, retaining unknown remote status."""
-    def __init__(self, *args, stop):
+    def __init__(self, *args, stop, authority=None):
         super().__init__(*args)
-        self.stop = stop
+        self.stop, self.authority = stop, authority
 
     def exchange(self, packet, before_access):
         if os.environ.get('KB_V21_OFFLINE_TEST')=='1':
             raise ContractError('real daily text wire disabled in offline tests')
         packet=dict(packet,codexBinary=self.codex_binary,cwd=self.cwd)
+        if self.authority is not None and self.authority.policy.standing_daily:
+            packet['binding'] = dict(packet['binding'], dailyRulesPath=str(self.authority.path),
+                dailyRulesSha=self.authority.digest)
         before_access()
         if self.stop.is_set():
             raise OSError('daily model stopped before client launch')

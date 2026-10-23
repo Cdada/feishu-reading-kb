@@ -98,6 +98,8 @@ class QAEngine:
             try:
                 output = self.model.run(job, plan)
             except Deferred as error:
+                if error.reason.startswith('subscription_'):
+                    raise  # Unsent work stays queued, with no consumed model call.
                 labels = {'model_limit':'累计模型额度已用完', 'qa_model_approval_required':'本次问答模型尚未启用',
                           'qa_model_grant_expired':'本次问答授权时间已到'}
                 reason = labels.get(error.reason, '本次模型结果未通过核验或状态不明，已停止自动重试')

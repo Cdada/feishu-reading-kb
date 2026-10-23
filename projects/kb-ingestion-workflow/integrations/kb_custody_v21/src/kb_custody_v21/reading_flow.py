@@ -32,7 +32,7 @@ class ReadingFlow:
         self.store=ReadingStore(backend.store)
         config=self.authority.config
         self.wire=wire if wire is not None else DailyTextWire(config['text_node'],self.profile.script,
-            config['codex_binary'],self.authority.runtime.worktree,stop=backend.stop)
+            config['codex_binary'],self.authority.runtime.worktree,stop=backend.stop,authority=self.authority)
         self.model=ReadingModel(self.authority,self.store,self.wire,checked_source=self.checked_source)
 
     def check(self):
@@ -259,6 +259,8 @@ class ReadingFlow:
                 text='已记录入库决定；完整整理等待补充来源信息，请回复对应的问题消息。'
             if reason=='reading_model_approval_required':
                 text='已记录入库决定；整理请求已准备，需在 Codex 确认本轮模型调用范围后继续。'
+            elif reason.startswith('subscription_'):
+                text='已记录入库决定；订阅余量不足或状态暂不可核验，任务保留排队，恢复后继续尚未发出的请求。'
             elif reason=='model_limit':
                 text='已记录入库决定；累计模型额度已用完，完整整理暂停，已有原件与结果保留。'
             elif reason.startswith('reading_model_result_') or reason=='reading_result_requires_codex_review':

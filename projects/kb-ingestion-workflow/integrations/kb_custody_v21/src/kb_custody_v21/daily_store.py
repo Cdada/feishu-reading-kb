@@ -422,7 +422,7 @@ class DailyStore:
             if rows and (len(rows) >= 2 or rows[-1]['state'] != 'retry_authorized'):
                 raise Deferred('model_already_reserved')
             count = db.execute('SELECT count(*) FROM daily_models').fetchone()[0]
-            if count >= self.policy.model_turn_limit:
+            if self.policy.model_limit_reached(count):
                 raise Deferred('model_limit')
             attempt = len(rows) + 1
             db.execute("INSERT INTO daily_models VALUES (?,?,'started',NULL,?)", (source_sha, attempt, self.now()))

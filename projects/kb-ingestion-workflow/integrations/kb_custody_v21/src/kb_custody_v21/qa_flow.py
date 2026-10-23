@@ -29,7 +29,7 @@ class QAFlow:
         self.index = QAIndex(backend.authority.root/'qa-index/index.sqlite3')
         c = backend.authority.config
         wire = wire if wire is not None else DailyTextWire(c['text_node'], self.profile.script,
-            c['codex_binary'], backend.authority.runtime.worktree, stop=backend.stop)
+            c['codex_binary'], backend.authority.runtime.worktree, stop=backend.stop, authority=backend.authority)
         self.model = QAModel(backend.authority, self.profile, self.store, self.sources, wire)
         self.engine = QAEngine(self.store, self.sources, self.index, self.model)
 

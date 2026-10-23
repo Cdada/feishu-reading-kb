@@ -80,7 +80,7 @@ class DailyScheduler:
         try:
             self.adapter.qa.step()
         except (Deferred, StorageUnavailable) as error:
-            self.store.put('qa-wait', dict(reason=str(error), until=self.store.now()+self.store.policy.poll_seconds))
+            self.store.put('qa-wait', dict(reason=str(error), until=getattr(error, 'until', None) or self.store.now()+self.store.policy.poll_seconds))
         else:
             self.store.put('qa-wait', None)
 

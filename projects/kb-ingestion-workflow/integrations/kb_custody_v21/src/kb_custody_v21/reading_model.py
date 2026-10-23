@@ -12,6 +12,7 @@ import re
 
 from .contracts import ContractError
 from .daily_store import Deferred
+from .daily_subscription import require_subscription
 from .daily_transport import durable_file
 from .f05 import file_sha
 from .pilot_text import MODEL, MAX_BYTES, safe_diagnostic
@@ -61,6 +62,8 @@ class ReadingModel:
                 raise Deferred('reading_result_requires_codex_review')
             if not receipt_path.exists():
                 raise Deferred('reading_model_result_unknown_no_resubmit')
+        if existing is None and profile.generation is not None:
+            require_subscription(self.authority, self.store.store)
         if not approval_path.exists() and profile.generation is not None:
             # Enabled only by a newly reviewed standing reading configuration.
             # Default/legacy profiles never enter this branch. The same original
@@ -68,7 +71,7 @@ class ReadingModel:
             material=self.store.get(material_id)
             answers=material['detail'].get('answers',[])
             accepted=answers[-1]['accepted_at'] if answers else material['created']
-            start=datetime.fromtimestamp(accepted,timezone.utc)
+            start=datetime.fromtimestamp(self.store.store.now() if self.store.store.policy.standing_daily else accepted,timezone.utc)
             g=profile.generation
             durable_file(approval_path,dict(reference='P41-reading-model-v1',approved=True,
                 purpose=purpose,material_id=material_id,source_sha256=source['binding']['source_sha256'],

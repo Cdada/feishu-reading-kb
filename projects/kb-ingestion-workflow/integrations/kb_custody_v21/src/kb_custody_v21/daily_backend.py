@@ -14,6 +14,7 @@ from .daily_original import restore_original
 from .daily_guide import generate_daily_guide, DailyTextWire
 from .daily_scheduler import MaterialProblem
 from .daily_store import Deferred
+from .daily_subscription import require_subscription
 from .daily_transport import DailyTransport
 from .f01 import PREFIX, validated_message_content
 from .f05 import file_sha
@@ -83,7 +84,7 @@ class DailyBackend:
         if self.wire is None:
             c=authority.config
             self.wire=DailyTextWire(c['text_node'],c['text_script'],c['codex_binary'],
-                                    authority.runtime.worktree,stop=self.stop)
+                                    authority.runtime.worktree,stop=self.stop,authority=authority)
 
     def check_authorization(self):
         return self.authority.check()
@@ -215,6 +216,9 @@ class DailyBackend:
             if count>=2:
                 break
         limits=self.store.rows("SELECT message_id FROM daily_documents WHERE phase IN ('converted','generating','model_unknown')")
+        subscription_wait = self.store.get('subscription-admission')
+        if subscription_wait:
+            self.notice('subscription-wait:'+self.authority.digest, '订阅余量不足或状态暂不可核验，未发送的任务已排队；恢复后继续，无需追加项目次数。', purpose='service')
         if any((self.store.get('defer:'+r['message_id']) or {}).get('reason')=='model_limit' for r in limits):
             key='model-budget:'+self.authority.policy.digest
             if not self.store.get('reported:'+key):
@@ -444,6 +448,8 @@ class DailyBackend:
             if images and images['decision']['choice']!='continue_without_missing':
                 raise MaterialProblem('已选择重新发送含图原件，等待补传。','resend_file')
             rows=self.store.rows('SELECT * FROM daily_models WHERE source_sha=? ORDER BY attempt',(source,))
+            if not rows:
+                require_subscription(self.authority, self.store)
             attempt=rows[-1]['attempt'] if rows else self.store.reserve_model(source)
             self.store.advance(mid,'converted','generating',data=dict(model_attempt=attempt),user_action=None)
             document=self.store.document(mid)

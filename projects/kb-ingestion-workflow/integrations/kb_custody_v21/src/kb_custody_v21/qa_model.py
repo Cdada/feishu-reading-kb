@@ -5,6 +5,7 @@ import json
 
 from .contracts import ContractError
 from .daily_store import Deferred
+from .daily_subscription import require_subscription
 from .daily_transport import durable_file
 from .f05 import file_sha
 from .pilot_text import MODEL, MAX_BYTES
@@ -161,11 +162,13 @@ class QAModel:
                 return validate(existing['result']['output'], plan['hits'])
             if existing['state']=='rejected' or not receipt.exists():
                 raise Deferred('qa_model_unknown_or_rejected_no_resubmit')
+        if existing is None and self.profile.generation is not None:
+            require_subscription(self.authority, self.store.daily)
         if not approval_path.exists():
             g = self.profile.generation
             if g is None:
                 raise Deferred('qa_model_approval_required')
-            start = datetime.fromtimestamp(job['created'], timezone.utc)
+            start = datetime.fromtimestamp(self.store.daily.now() if self.store.daily.policy.standing_daily else job['created'], timezone.utc)
             durable_file(approval_path, dict(reference='P43-qa-model-v1', approved=True, model=MODEL,
                 effort='medium', billing='chatgpt_subscription_only', max_business_turns=1,
                 automatic_business_retries=0, request_sha256=[digest], daily_rules_sha256=self.authority.digest,
