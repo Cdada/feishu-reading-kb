@@ -123,6 +123,7 @@ class RegressionPlanningTests(unittest.TestCase):
     def test_other_library_and_future_watermark_rejected(self):
         with self.assertRaises(ContractError): changes(manifest(), dict(manifest(), corpus_id='another'))
         with self.assertRaises(ContractError): plan(last_completed={'weekly': '2031-01-01T00:00:00+08:00'})
+        with self.assertRaisesRegex(ContractError, 'different library'): plan(cases=[dict(fixture(), corpus_id='another-library')])
 
 
 class RegressionStoreTests(unittest.TestCase):

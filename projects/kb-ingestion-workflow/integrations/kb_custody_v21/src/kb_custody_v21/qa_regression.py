@@ -85,6 +85,8 @@ def plan_regression(previous, current, cases, *, now, last_completed=None,
     eligible = {k: v for k, v in by_id.items() if include_heldout or v.get('split') != 'heldout'}
     require(eligible and all(k in eligible for k in core_ids), 'core cases cannot silently expose heldout data')
     current = snapshot(current)
+    require(all('corpus_id' not in c or c['corpus_id'] == current['corpus_id'] for c in cases),
+        'regression cases belong to a different library')
     old_hash = digest(snapshot(previous)) if previous else None
     new_hash = digest(current)
     delta = changes(previous, current)

@@ -186,6 +186,10 @@ class ReportsTests(unittest.TestCase):
         for records in ([r, r], [dict(r, id='unknown')], [dict(r, fixture_sha256='0'*64)]):
             with self.assertRaises(ContractError): self.report([f], records)
 
+    def test_scoring_cannot_relabel_another_librarys_cases(self):
+        f = dict(fixture(), corpus_id='another-library')
+        with self.assertRaisesRegex(ContractError, 'different library'): self.report([f])
+
     def test_comparison_rejects_changed_cases_and_corpus(self):
         baseline = self.report()
         for candidate in (self.report([fixture('new')]), self.report(run=dict(run_config(), corpus_sha256='e'*64))):

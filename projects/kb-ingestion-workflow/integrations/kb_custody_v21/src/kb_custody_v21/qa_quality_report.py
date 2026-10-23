@@ -34,6 +34,7 @@ def make_report(cases, records, run, *, calibration_report=None):
     for case in cases:
         verify_fixture(case)
         require(case['id'] not in by_case, 'duplicate test id')
+        require('corpus_id' not in case or case['corpus_id'] == run['corpus_id'], 'case belongs to a different library')
         by_case[case['id']] = case
     by_record = {}
     for record in records:
