@@ -109,3 +109,16 @@ python -m kb_custody_v21.qa_quality_cli compare --baseline .dev-runtime/eval/old
 ```sh
 PYTHONPATH=projects/kb-ingestion-workflow/integrations/kb_custody_v21/src:projects/kb-ingestion-workflow/integrations/kb_custody_v21/tests python -m unittest test_qa_quality test_qa_quality_calls test_qa_regression test_qa_quality_cli test_qa_quality_subscription test_qa_quality_pilot
 ```
+
+
+## 输出约束与评分参考复核
+
+回答提示词、生成JSON结构与本地校验均限制每条主张1–4条逐字引用，最多6条主张；
+需要更多依据时按子结论拆分，并保留全部必要支持。校验不自动删除引用、拼接原文或重试。
+引用数量超限会明确报出数量要求；文字超限与无效原文另行报告。
+合成回归覆盖7条引用被拒、拆成4＋3后通过，以及拆分后伪造引用仍被拒绝；跨语言测试核对生成与校验的长度限制。
+
+评分按语义接受等价表达，不要求固定提醒句；参考要求没有证据支持的附件、版本或定位时，
+裁判应标记不确定并说明参考缺口，交由复核。不能为了让样本通过而取消事实或必要覆盖要求。
+参考修订必须创建新版本并保留旧哈希和旧评分；提示词或裁判说明变化后，旧校准仅作历史记录，
+不能宣称新版已经获得真实模型验收。离线合成测试通过不证明新版模型仍能稳定遵守这些约束。

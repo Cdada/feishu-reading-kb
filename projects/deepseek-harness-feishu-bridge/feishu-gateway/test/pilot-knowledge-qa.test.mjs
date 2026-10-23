@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { runQA, qaSchema, qaClientOptions } from '../src/pilot-knowledge-qa.mjs';
 import { MODEL } from '../src/pilot-reading-guide.mjs';
 
@@ -51,4 +53,26 @@ test('weekly synthesis retains one subscription turn and evidence ceiling',async
   g.packet.request=JSON.stringify(r);g.packet.binding.requestSha=sha(g.packet.request);
   await assert.rejects(runQA(g.packet,{client:g.client,check:async()=>{}}));
   assert.equal(g.calls.length,0);
+});
+
+test('generation schema and Python validation share all size bounds', () => {
+  const source = fileURLToPath(new URL('../../../kb-ingestion-workflow/integrations/kb_custody_v21/src/', import.meta.url));
+  const script = `import json,sys
+sys.path.insert(0,sys.argv[1])
+from kb_custody_v21 import qa_answer_contract as c
+print(json.dumps({k:getattr(c,k) for k in (
+ "MAX_CLAIMS","MAX_CLAIM_CHARACTERS","MAX_EVIDENCE_PER_CLAIM",
+ "MIN_QUOTE_CHARACTERS","MAX_QUOTE_CHARACTERS","MAX_GAPS","MAX_GAP_CHARACTERS")}))`;
+  const result = spawnSync(process.env.KB_V21_PYTHON || 'python3', ['-c', script, source],
+    { encoding: 'utf8', env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' } });
+  assert.equal(result.status, 0, result.stderr || result.error?.message);
+  const c = JSON.parse(result.stdout), p = qaSchema.properties;
+  const claim = p.claims.items.properties, evidence = claim.evidence;
+  assert.equal(p.claims.maxItems, c.MAX_CLAIMS);
+  assert.equal(claim.text.minLength, 1); assert.equal(claim.text.maxLength, c.MAX_CLAIM_CHARACTERS);
+  assert.equal(evidence.minItems, 1); assert.equal(evidence.maxItems, c.MAX_EVIDENCE_PER_CLAIM);
+  assert.equal(evidence.items.properties.quote.minLength, c.MIN_QUOTE_CHARACTERS);
+  assert.equal(evidence.items.properties.quote.maxLength, c.MAX_QUOTE_CHARACTERS);
+  assert.equal(p.gaps.maxItems, c.MAX_GAPS);
+  assert.equal(p.gaps.items.minLength, 1); assert.equal(p.gaps.items.maxLength, c.MAX_GAP_CHARACTERS);
 });

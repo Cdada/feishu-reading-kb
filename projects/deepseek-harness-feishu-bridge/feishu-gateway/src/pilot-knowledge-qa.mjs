@@ -8,9 +8,13 @@ const string = { type: 'string' };
 const object = (properties) => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
 export const qaSchema = object({
   status: { type: 'string', enum: ['grounded', 'partial', 'not_found'] },
-  claims: { type: 'array', items: object({ text: string,
-    evidence: { type: 'array', items: object({ evidence_id: string, quote: string }) } }) },
-  gaps: { type: 'array', items: string },
+  // These bounds match qa_answer_contract.validate; the cross-runtime test
+  // prevents generation and downstream validation from silently diverging.
+  claims: { type: 'array', maxItems: 6, items: object({ text: { ...string, minLength: 1, maxLength: 240 },
+    evidence: { type: 'array', minItems: 1, maxItems: 4,
+      items: object({ evidence_id: { ...string, minLength: 1 },
+        quote: { ...string, minLength: 4, maxLength: 450 } }) } }) },
+  gaps: { type: 'array', maxItems: 6, items: { ...string, minLength: 1, maxLength: 300 } },
 });
 
 export function qaClientOptions(args) {
