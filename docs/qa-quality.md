@@ -40,6 +40,8 @@ PYTHONPATH=projects/kb-ingestion-workflow/integrations/kb_custody_v21/src:projec
 
 ## 更新与定期回归
 
+日常管理入口见[系统功能清单](system-functions.md)和[手动离线回归](manual-offline-regression.md)。当前按需调用；下述每周/月度规则是执行时的计划算法，保留规则不等于已启用定时调度。
+
 `qa_regression.plan_regression()` 是不执行任务的规划函数。时间输入必须带时区，按北京时间计算最近的周日20:00及每月首个周日20:00；休眠漏跑只规划最近一次，不补一长串模型调用。
 
 资料清单必须经核验，字段为 `corpus_id` 和 `sources`；每个来源包含 `id`、`canonical_id`、`body_sha256`、`metadata_sha256`、`critical`。同源资料以 `canonical_id` 去重统计。元数据摘要应覆盖来源身份、日期、版本及权限；文件修改时间不能替代正文变化。清单的构建者负责实际读取与核验，这不是无人值守的任意目录扫描器。
