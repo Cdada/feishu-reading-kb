@@ -31,6 +31,8 @@ flowchart TD
 - 关联候选供人判断，没有合适资料时允许无关联。
 - 存储身份核对、内容备份与恢复工具；真实迁移、建卷和云盘同步需要另外配置与明确执行。
 
+- [读书简报模型变更手动检查](docs/manual-model-check.md)：由 Codex 按用户明确请求核对配置、运行记录和官方变化，确认后才更换。
+
 ## 开始使用
 
 先看 [离线开发与测试](docs/development.md)，再看 [配置与归档规则](docs/configuration.md)。实现入口见 [结构与边界](docs/architecture.md)。
