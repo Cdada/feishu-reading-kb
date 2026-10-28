@@ -1,6 +1,7 @@
 """Render reviewed reading content; keep source, cards and navigation distinct."""
 from copy import deepcopy
 import hashlib
+from html import escape
 import json
 from pathlib import PurePosixPath
 import posixpath
@@ -12,6 +13,8 @@ from markdown_it import MarkdownIt
 import yaml
 
 from .contracts import ContractError
+from . import table_evidence
+from .layout_evidence import checked_policy
 from .reading_contract import CATEGORIES, require, sha, validate_review
 from .registry import encoded
 from .safe_publish import manifest, parts
@@ -166,6 +169,29 @@ def build_bundle(source, draft, review, *, assets, date, existing_files):
         overview += '\n\n## 使用边界\n\n'+'\n\n'.join(draft['limitations'])
     if source['image_boundary']:
         overview += '\n\n图片读取边界：'+source['image_boundary']
+    mapping = json.loads(assets.get('提取/extraction-map.json', b'{}'))
+    if mapping:
+        require(mapping.get('output_sha256') == hashlib.sha256(assets['提取/source.md']).hexdigest()
+                and mapping.get('offset_unit') == 'unicode_code_point'
+                and mapping.get('range_convention') == 'half_open', 'table page map differs from source')
+    pages = [dict(page=p['page_index']+1, **r) for p in mapping.get('page_mappings', []) for r in p['text_ranges']]
+    excluded = checked_policy(source['provenance'].get('evidence_policy'), source['original'])
+    tables = table_evidence.inventory(source['original'], pages, excluded)
+    if tables['tables']:
+        path = group+'/表格目录.md'
+        inventory_path = group+'/入库依据/提取/tables.json'
+        require(inventory_path not in files, 'duplicate table inventory path')
+        files[inventory_path] = (encoded(tables)+'\n').encode()
+        body = '# 表格目录\n\n结构检查只检查识别结果的行列关系，不证明数字、单位和表头与原 PDF 相同。\n\n'
+        for table in tables['tables']:
+            body += '## '+table['id']+'\n\n'+label(table_evidence.notice([table]))+'\n\n'
+            body += link(path, group+'/原文.md', '查看完整提取原文')+f"；原文字符 {table['char_start']}–{table['char_end']}\n\n"
+        body += link(path, inventory_path, '机器可读的表格、单元格与原文位置')
+        for asset in sorted(assets):
+            if asset.lower().endswith('.pdf'):
+                body += '\n\n'+link(path, group+'/入库依据/'+asset, '对照 PDF 原件：'+asset)
+        put(path, dict(metadata, type='table_index', workflow_role='navigation'), body)
+        overview += '\n\n'+link(note, path, '表格目录与核验状态')
     put(group+'/来源卡片.md', metadata, overview)
     claims = {c['id']: c for c in draft['claims']}
     def content(sections, origin):
@@ -179,7 +205,7 @@ def build_bundle(source, draft, review, *, assets, date, existing_files):
                     result += '\n\n适用条件与边界：'+'；'.join(c['conditions'])
                 for e in c['evidence']:
                     target = group+('/摘录.md' if e['source']=='excerpts' else '/原文.md')
-                    result += '\n\n'+link(origin, target, '来源依据')+'：\n\n'+'\n'.join('> '+line for line in e['quote'].splitlines())
+                    result += '\n\n'+link(origin, target, '来源依据')+'：\n\n'+'\n'.join('> '+escape(line, quote=False) for line in e['quote'].splitlines())
         return result
     note_meta = dict(metadata, type='reading_note', workflow_role='formal')
     for name, sections in [('文章客观整理.md', draft['objective']), ('综合读书笔记.md', draft['synthesis'])]:
@@ -196,7 +222,7 @@ def build_bundle(source, draft, review, *, assets, date, existing_files):
         keyword_body += '\n\n## '+title+'\n'
         for entry in draft['keywords'][key]:
             keyword_body += '\n\n'+label(entry['term'])+'（'+('直接提取' if entry['kind']=='direct' else '语义归纳')+'）\n\n'
-            keyword_body += '\n'.join('> '+line for line in entry['evidence']['quote'].splitlines())
+            keyword_body += '\n'.join('> '+escape(line, quote=False) for line in entry['evidence']['quote'].splitlines())
         if not draft['keywords'][key]:
             keyword_body += '\n未提取；不按数量补造。'
     put(group+'/关键词提取.md', dict(metadata,type='source_analysis'), keyword_body)

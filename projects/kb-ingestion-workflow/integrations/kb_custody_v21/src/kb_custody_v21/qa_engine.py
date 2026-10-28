@@ -94,6 +94,10 @@ class QAEngine:
             status = 'partial_retrieval'
         elif not hits or query['mode'] in ('search', 'source', 'version'):
             text, status = render_search(hits, version=query['mode']=='version'), 'retrieval'
+        elif (any(not t['qa_usable'] for h in hits for t in h.get('table_context', []))
+              or sum(len(h['text']) for h in hits) > 24000):
+            text = '检索命中待核查、过长的表格，或超出本次回答容量。请先对照原表或缩小范围；本次未调用模型。\n\n'+render_search(hits)
+            status = 'table_review_required'
         else:
             try:
                 output = self.model.run(job, plan)

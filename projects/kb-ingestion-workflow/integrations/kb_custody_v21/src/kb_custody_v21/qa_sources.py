@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 from .contracts import ContractError
+from . import table_evidence
 from .f05 import file_sha
 from .layout_evidence import checked_policy
 from .reading_contract import sha
@@ -103,6 +104,8 @@ class QASources:
         """Re-read selected originals at the model and delivery boundaries."""
         sources = {key: self.get(key) for key in dict.fromkeys(h['material_id'] for h in hits)}
         evidence = {}
+        tables = {key: table_evidence.summaries(table_evidence.inventory(s['text'], s['pages'], s['excluded_ranges']))
+                  for key, s in sources.items()}
         for hit in hits:
             source = sources[hit['material_id']]
             a, z = hit['char_start'], hit['char_end']
@@ -110,5 +113,8 @@ class QASources:
                     or source['text'][a:z] != hit['text']
                     or any(a < r['char_end'] and r['char_start'] < z for r in source['excluded_ranges'])):
                 raise ContractError('检索依据已失效，请重新查询。')
+            expected_tables = table_evidence.context_for(tables[hit['material_id']], a, z)
+            if expected_tables != hit.get('table_context', []):
+                raise ContractError('表格位置或结构依据已变化，请重新查询。')
             evidence.update(source['evidence'])
         return evidence

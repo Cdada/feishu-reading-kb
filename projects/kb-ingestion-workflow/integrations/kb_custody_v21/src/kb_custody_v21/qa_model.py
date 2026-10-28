@@ -19,8 +19,12 @@ from .qa_answer_contract import INSTRUCTION, validate
 
 
 def request(plan):
+    if any(not t['qa_usable'] for h in plan['hits'] for t in h.get('table_context', [])):
+        raise ContractError('待核查或过长的表格只提供原表定位，本次不生成数值回答。')
+    if sum(len(h['text']) for h in plan['hits']) > 24000:
+        raise ContractError('检索片段超过本次回答容量，请缩小问题范围。')
     keys = ('evidence_id', 'material_id', 'title', 'text', 'is_paper', 'publication_year', 'completeness', 'content_nature')
-    evidence = [{k: h[k] for k in keys} | {k: h.get(k) for k in ('work_title', 'doi', 'source_sha256', 'document_role')} for h in plan['hits']]
+    evidence = [{k: h[k] for k in keys} | {k: h.get(k) for k in ('work_title', 'doi', 'source_sha256', 'document_role', 'table_context')} for h in plan['hits']]
     packet = dict(protocol='P43-qa-v1', instruction=INSTRUCTION,
                 question=plan['query']['question'], intent=plan['query']['mode'],
                 prior_question=plan['query'].get('prior_question', ''),
@@ -69,6 +73,8 @@ def render_evidence(output, hits):
         lines.append('尚未解决：'+'；'.join(output['gaps']))
     lines.extend(citation(by_id[key], materials.index(by_id[key]['material_id'])+1) for key in cited)
     lines.append('引文已逐字校验；概括由 AI 生成，判断适用性时请核对原文上下文。')
+    if any(h.get('table_context') for h in hits):
+        lines.append('表格引文只与提取文本核对；数字、单位和表头尚未与 PDF 原页逐项核验。')
     return '\n\n'.join(lines)
 
 
@@ -124,6 +130,8 @@ def render_answer(output, hits, selected=()):
         pages=' · PDF 物理页 '+','.join(map(str,hit['physical_pages'])) if hit.get('physical_pages') else ''
         lines.append('['+str(materials.index(key)+1)+'] '+title+pages)
     lines.append('完整主张、引文及定位可点击“查看原文依据”。概括由 AI 生成，引文已逐字核对。')
+    if any(h.get('table_context') for h in hits):
+        lines.append('表格数值尚未对照 PDF 原页核验，请通过“查看原文依据”核对表名、物理页码和单位。')
     return '\n\n'.join(lines)
 
 

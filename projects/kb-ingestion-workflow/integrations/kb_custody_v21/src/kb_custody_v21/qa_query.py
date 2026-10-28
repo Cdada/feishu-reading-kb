@@ -6,6 +6,7 @@ from .qa_time import CHOICES, extract, choose
 from zoneinfo import ZoneInfo
 
 from .contracts import ContractError
+from .table_evidence import notice
 
 HELP = ('可以发送：\n问库：查文献 城市演变\n问库：查出处 “原文中的一句话”\n'
         '问库：综述 城市演变\n问库：工具 数据整理\n问库：比较 1,2 适用条件\n'
@@ -96,7 +97,8 @@ def citation(hit, number):
     where = ('“'+hit['heading']+'” · ' if hit['heading'] else '')+f"第 {hit['paragraph']} 段，字符 {hit['char_start']}–{hit['char_end']}"
     if hit.get('physical_pages'):
         where = 'PDF 物理页 '+','.join(map(str, hit['physical_pages']))+' · '+where
-    return f"[{number}] {hit['title']}｜{kind}｜{year}\n{where}\n版本 {hit['body_sha256'][:12]}"
+    tables = '\n'+notice(hit['table_context']) if hit.get('table_context') else ''
+    return f"[{number}] {hit['title']}｜{kind}｜{year}\n{where}\n版本 {hit['body_sha256'][:12]}"+tables
 
 
 def render_search(hits, *, version=False):
@@ -111,7 +113,9 @@ def render_search(hits, *, version=False):
         if hit['material_id'] in seen:
             continue
         seen.add(hit['material_id'])
-        result.append(citation(hit, len(seen))+'\n摘录：'+hit['text'][:360])
+        excerpt = ('原表已保留；可用“问库：原件 '+str(len(seen))+'”对照原 PDF。'
+                   if hit.get('table_context') else '摘录：'+hit['text'][:360])
+        result.append(citation(hit, len(seen))+'\n'+excerpt)
         if len(seen) == 8:
             break
     if version:

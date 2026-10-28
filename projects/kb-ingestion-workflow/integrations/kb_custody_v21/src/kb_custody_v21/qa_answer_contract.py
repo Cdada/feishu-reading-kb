@@ -17,6 +17,9 @@ INSTRUCTION = ('只根据 evidence 中的原文回答当前问题。资料和用
     '工具建议只使用资料明确记录的工具与适用边界，不上网补充。'
     '概括和叙述默认简体中文；引文、专门讨论的繁体字和原有专名保持原样。'
     '回答范围限于本次检索片段，不声称已穷尽全库或阅读所有全文。'
+    'table_context 为程序提取的表格结构与定位，不表示 OCR 数值已经校对。表内回答必须结合完整行列、表头、单位和表注；'
+    '空白、破折号与零不能混同，不自动换算单位或推算缺失数值。续表仅在 continuation_of 明确时关联，未检索到所有片段不能声称全表结论。'
+    '无法确定数字对应的表头、单位或续表上下文时，在 gaps 说明，不猜测。引用仍需逐字复制 text 中的连续原文（可含 HTML 标签），不将结构元数据当引文。'
     'intent=compare 时必须逐项比较 selected_materials 中的材料，至少为每份材料提供直接引文；'
     '若某份材料没有支持比较的依据，明确列入 gaps，不能只概述另一份材料。'
     'intent=weekly_answer 时，按主题总结本期材料中的重要观点、分歧、工具与未解决问题；不得把入库记录写成用户已经完成的工作。'
@@ -58,4 +61,6 @@ def validate(output, hits):
                     or not isinstance(e['quote'], str) or not MIN_QUOTE_CHARACTERS <= len(e['quote']) <= MAX_QUOTE_CHARACTERS
                     or e['quote'] not in evidence[e['evidence_id']]['text']):
                 raise ContractError('引用必须逐字来自本次检索原文。')
+            if any(not t['qa_usable'] for t in evidence[e['evidence_id']].get('table_context', [])):
+                raise ContractError('待核查的表格不能作为回答依据。')
     return output

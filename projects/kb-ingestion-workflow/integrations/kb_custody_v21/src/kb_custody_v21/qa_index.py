@@ -16,6 +16,7 @@ from .qa_language import declared_aliases, variants
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from .runtime import no_symlinks
+from . import table_evidence
 
 SCHEMA = '''
 CREATE TABLE IF NOT EXISTS qa_index_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);
@@ -38,23 +39,39 @@ def tokens(text):
     return list(dict.fromkeys(result))
 
 
-def chunks(source):
+def source_tables(source):
+    return table_evidence.summaries(table_evidence.inventory(
+        source['text'], source.get('pages', []), source['excluded_ranges']))
+
+
+def chunks(source, tables=None):
     text, heading = source['text'], ''
-    # Paragraphs stay in source coordinates even when a repeated header is
-    # removed. Never concatenate across an excluded range into a quotation.
-    for number, match in enumerate(re.finditer(r'\S[^\n]*(?:\n(?!\s*\n)[^\n]+)*', text), 1):
+    tables = source_tables(source) if tables is None else tables
+    paragraphs = list(re.finditer(r'\S[^\n]*(?:\n(?!\s*\n)[^\n]+)*', text))
+    result = []
+    protected = [dict(char_start=t['evidence_start'], char_end=t['char_end']) for t in tables]
+    for number, match in enumerate(paragraphs, 1):
         if match.group().startswith('#'):
             heading = match.group().splitlines()[0].lstrip('# ').strip()[:160]
         intervals = [(match.start(), match.end())]
-        for r in source['excluded_ranges']:
+        for r in [*source['excluded_ranges'], *protected]:
             intervals = [(x, y) for a, z in intervals for x, y in
                          ((a, min(z, r['char_start'])), (max(a, r['char_end']), z)) if x < y]
         for a, z in intervals:
             while a < z:
                 end = min(a+900, z)
                 if text[a:end].strip():
-                    yield a, end, number, heading, text[a:end]
+                    result.append((a, end, number, heading, text[a:end]))
                 a = end
+    for t in tables:
+        a, z = t['evidence_start'], t['char_end']
+        if any(a < r['char_end'] and r['char_start'] < z for r in source['excluded_ranges']):
+            continue
+        number = next((i for i, p in enumerate(paragraphs, 1) if p.start() <= a < p.end()), 1)
+        # Whole fragments retain multi-row headers, units, notes and merged
+        # cells. Cross-page links do not concatenate discontinuous quotations.
+        result.append((a, z, number, t['caption'], text[a:z]))
+    yield from sorted(result)
 
 
 class QAIndex:
@@ -98,14 +115,18 @@ class QAIndex:
         for key in ids:
             source = provider.get(key)
             metadata = {k: v for k, v in source.items() if k not in ('text', 'evidence')}
-            metadata['aliases'] = declared_aliases('\n\n'.join(body for *_, body in chunks(source)))
+            tables = source_tables(source)
+            metadata['tables'] = tables
+            metadata['chunking_revision'] = table_evidence.VERSION
+            source_chunks = list(chunks(source, tables))
+            metadata['aliases'] = declared_aliases('\n\n'.join(body for *_, body in source_chunks))
             digest = hashlib.sha256(encoded(metadata).encode()).hexdigest()
             if old.get(key) == digest:
                 continue
             with self.connection() as db:
                 self.remove(db, key)
                 db.execute('INSERT INTO qa_sources VALUES (?,?,?)', (key, digest, encoded(metadata)))
-                for a, z, p, heading, body in chunks(source):
+                for a, z, p, heading, body in source_chunks:
                     row = db.execute('INSERT INTO qa_chunks(material_id,start,end,paragraph,heading,text) VALUES (?,?,?,?,?,?)',
                                      (key, a, z, p, heading, body))
                     db.execute('INSERT INTO qa_fts(rowid,title,keywords,body) VALUES (?,?,?,?)',
@@ -165,11 +186,23 @@ class QAIndex:
             # Discard accidental one-bigram matches in a long natural question.
             if len(overlap) < min(2, len(matched)):
                 continue
-            hit = dict(meta, text=row['text'], char_start=row['start'], char_end=row['end'],
+            table_context = table_evidence.context_for(meta.get('tables', []), row['start'], row['end'])
+            end = row['end']
+            if any(not t['qa_usable'] for t in table_context):
+                # Full text remains searchable, but unsafe/oversize tables are
+                # navigation only. Return the caption/opening tag, never a
+                # misleading partial row to a model or to a result card.
+                t = table_context[0]
+                end = min(end, t['char_start']+len('<table>'))
+            hit = dict(meta, text=row['text'][:end-row['start']], char_start=row['start'], char_end=end,
                        paragraph=row['paragraph'], heading=row['heading'], score=score, query_expansions=alternatives[1:])
+            hit.pop('tables', None)
+            hit.pop('chunking_revision', None)
+            if table_context:
+                hit['table_context'] = table_context
             hit['physical_pages'] = sorted({p['page'] for p in meta.get('pages', [])
                                            if p['char_start'] < row['end'] and row['start'] < p['char_end']})
-            hit['evidence_id'] = hashlib.sha256(encoded([meta['material_id'], meta['body_sha256'], row['start'], row['end']]).encode()).hexdigest()[:24]
+            hit['evidence_id'] = hashlib.sha256(encoded([meta['material_id'], meta['body_sha256'], row['start'], end]).encode()).hexdigest()[:24]
             ranked.append((hit, row['rank']))
         ranked.sort(key=lambda pair: (-pair[0]['score'], pair[1], pair[0]['material_id'], pair[0]['char_start']))
         # Round-robin source diversity: a long paper must not crowd out others.
