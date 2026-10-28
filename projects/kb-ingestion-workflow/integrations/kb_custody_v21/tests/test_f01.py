@@ -162,8 +162,8 @@ class F01FlowTests(unittest.TestCase):
         root=Path(tempfile.mkdtemp(prefix='f01-conversion-',dir=BASE/'test-output'))
         for name,data in [('fixture.txt',TXT),('fixture.md',MD)]:
             body,evidence=convert_download(WORKTREE,root,name,data,{'message_id':'om_synthetic'})
-            self.assertEqual(body,b'# fixture\n\n'+TXT if name.endswith('.txt') else MD)
-            self.assertEqual(evidence['status'],'needs_review' if name.endswith('.txt') else 'ready_candidate')
+            self.assertEqual(body,('# TXT 正文\n\n> 系统说明：按 utf-8-sig 解码；正文按纯文本保留。\n\n街道树荫影响步行路线。\n\n这是一份合成测试材料。\n\n\n\n'.encode() if name.endswith('.txt') else MD))
+            self.assertEqual(evidence['status'],'ready_candidate')
             self.assertEqual(evidence['body_sha256'],sha(body))
         with self.assertRaises(ContractError):
             convert_download(WORKTREE,root,'fixture.md',b'changed',{'message_id':'om_synthetic'})

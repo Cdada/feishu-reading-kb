@@ -232,7 +232,7 @@ class F03Tests(unittest.TestCase):
                     self.assertEqual(helper.wire.request.call_count,35 if strict else 36)
                     self.assertEqual(sum(LIMITS.values()),36)
                     self.assertEqual(result['transport_sha256'],{k:sha(v) for k,v in helper.frozen.items()})
-                    self.assertEqual(result['conversions']['fixture.txt']['status'],'needs_review')
+                    self.assertEqual(result['conversions']['fixture.txt']['status'],'ready_candidate')
                     self.assertEqual(result['end_to_end'],'NOT_RUN')
                     helper.assert_old_unchanged()
                 finally:

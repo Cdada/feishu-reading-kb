@@ -115,7 +115,7 @@ class PilotIntakeTests(unittest.TestCase):
         self.assertEqual(len(self.registry.rows('SELECT * FROM intake_entries')),1)
 
     def test_unsupported_is_saved_but_not_sent_to_new_converter(self):
-        m=message(); m['resources'][0]['fileName']='synthetic.docx'
+        m=message(); m['resources'][0]['fileName']='synthetic.pptx'
         eid=self.receive(m)
         self.assertEqual(self.flow.work_once()['state'],'idle')
         self.assertEqual(self.flow.status(eid)['processing_state'],'custody_only')
