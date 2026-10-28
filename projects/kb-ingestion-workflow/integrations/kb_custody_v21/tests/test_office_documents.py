@@ -57,6 +57,23 @@ def amend(raw, name, mutate):
 
 
 class OfficeExtractionTests(unittest.TestCase):
+    def test_word_unsupported_visible_content_is_never_silently_dropped(self):
+        for tag in ('customXml', 'sym', 'vanish'):
+            raw=amend(word(),'word/document.xml',lambda b:b.replace(b'<w:body>',b'<w:body><w:'+tag.encode()+b'/>',1))
+            with self.subTest(tag=tag),self.assertRaisesRegex(DocumentProblem,'Word 含'):
+                extract_document(raw,'.docx')
+
+    def test_excel_row_and_cell_coordinates_must_agree(self):
+        raw=amend(excel(),'xl/worksheets/sheet1.xml',lambda b:b.replace(b'r="B2"',b'r="B1"',1))
+        with self.assertRaisesRegex(DocumentProblem,'坐标'):
+            extract_document(raw,'.xlsx')
+
+    def test_word_missing_grid_never_becomes_an_empty_table(self):
+        import re
+        raw=amend(word(),'word/document.xml',lambda b:re.sub(rb'<w:tblGrid>.*?</w:tblGrid>',b'<w:tblGrid/>',b))
+        with self.assertRaisesRegex(DocumentProblem,'列结构'):
+            extract_document(raw,'.docx')
+
     def test_txt_encodings_and_literal_markup(self):
         for encoding in ('utf-8','utf-8-sig','utf-16','utf-32','gb18030'):
             with self.subTest(encoding=encoding):

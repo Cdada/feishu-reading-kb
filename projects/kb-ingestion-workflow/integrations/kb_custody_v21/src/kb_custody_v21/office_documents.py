@@ -160,9 +160,9 @@ def word_document(raw, blobs, xml):
     # These change visible text or introduce alternatives the reader cannot
     # faithfully linearize. Fail before presenting partial content as complete.
     unsupported = {'ins', 'del', 'moveFrom', 'moveTo', 'sdt', 'altChunk', 'txbxContent',
-                   'object', 'fldSimple', 'fldChar', 'instrText'}
+                   'object', 'fldSimple', 'fldChar', 'instrText', 'customXml', 'sym', 'vanish'}
     if any(e.tag in {W+n for n in unsupported} or e.tag.endswith(('}oMath', '}AlternateContent', '}chart', '}relIds', '}pict')) for e in main.iter()):
-        raise DocumentProblem('Word 含修订、域、文本框、公式或内容控件，请先接受修订/转为普通正文，或提交 PDF。')
+        raise DocumentProblem('Word 含修订、域、文本框、公式、隐藏文字、符号字体或内容控件，请先接受修订/转为普通正文，或提交 PDF。')
     if not any((e.text or '').strip() for e in main.iter(W+'t')) and not any(e.tag == qn('a:blip') for e in main.iter()):
         raise DocumentProblem('Word 正文为空或只有未支持的对象，请提交可读取的正文。')
     document = Document(BytesIO(raw))
@@ -199,6 +199,8 @@ def word_document(raw, blobs, xml):
         return ''.join(parts)
 
     def table(t, depth=0):
+        if not t.columns:
+            raise DocumentProblem('Word 表格缺少列结构，请重新另存或提交 PDF。')
         if depth > 4 or len(t.rows)*len(t.columns) > MAX_CELLS:
             raise DocumentProblem('Word 表格过大或嵌套过深，请拆分后提交。')
         positions, objects = {}, {}
@@ -266,6 +268,22 @@ def spreadsheet(raw, blobs, xml):
     for name, root in xml.items():
         if re.fullmatch(r'xl/worksheets/sheet\d+\.xml', name):
             cells = list(root.iter(X+'c'))
+            previous_row = 0
+            row_cells = []
+            for row in root.iter(X+'row'):
+                ri = int(row.get('r', '0'))
+                if ri <= previous_row:
+                    raise DocumentProblem('Excel 行号重复或次序异常，请重新另存。')
+                previous_row = ri
+                previous_column = 0
+                for cell in row.findall(X+'c'):
+                    cr, cc = coordinate_to_tuple(cell.get('r', ''))
+                    if cr != ri or cc <= previous_column:
+                        raise DocumentProblem('Excel 单元格坐标与所在行不一致或次序异常，请重新另存。')
+                    previous_column = cc
+                    row_cells.append(cell)
+            if cells != row_cells:
+                raise DocumentProblem('Excel 含无法定位到行的单元格，请重新另存。')
             rows, cols = 0, 0
             seen = set()
             for cell in cells:
