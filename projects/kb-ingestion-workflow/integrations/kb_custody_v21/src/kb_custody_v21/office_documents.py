@@ -113,6 +113,9 @@ def package(raw, extension):
                             raise DocumentProblem('文件依赖外部图片或数据，请先将内容嵌入文件；不会联网补取。')
     except (DefusedXmlException, ParseError) as exc:
         raise DocumentProblem('Office XML 不安全或已损坏，请重新另存文件。') from exc
+    roots = [rel for rel in xml.get('_rels/.rels', []) if rel.get('Type', '').endswith('/officeDocument')]
+    if len(roots) != 1 or roots[0].get('Target', '').lstrip('/') != required:
+        raise DocumentProblem('Office 主文档关系不是支持的标准位置，请重新另存文件。')
     return blobs, xml
 
 

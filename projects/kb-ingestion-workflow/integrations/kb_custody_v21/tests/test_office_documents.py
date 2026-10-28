@@ -57,6 +57,13 @@ def amend(raw, name, mutate):
 
 
 class OfficeExtractionTests(unittest.TestCase):
+    def test_package_root_cannot_redirect_around_the_validated_body(self):
+        for raw, ext, old, new in ((word(), '.docx', b'word/document.xml', b'word/alternate.xml'),
+                                   (excel(), '.xlsx', b'xl/workbook.xml', b'xl/alternate.xml')):
+            changed=amend(raw,'_rels/.rels',lambda value:value.replace(old,new))
+            with self.subTest(ext=ext),self.assertRaisesRegex(DocumentProblem,'主文档关系'):
+                extract_document(changed,ext)
+
     def test_word_unsupported_visible_content_is_never_silently_dropped(self):
         for tag in ('customXml', 'sym', 'vanish'):
             raw=amend(word(),'word/document.xml',lambda b:b.replace(b'<w:body>',b'<w:body><w:'+tag.encode()+b'/>',1))
