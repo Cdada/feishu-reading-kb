@@ -235,7 +235,7 @@ def inventory(text, pages=(), excluded_ranges=()):
                  sha256=digest(text[a:z]), content_verification='not_checked_against_pdf',
                  header_status='explicit' if t['header_rows'] else 'not_marked',
                  structure_status='needs_review' if t['issues'] else 'consistent',
-                 qa_usable=not t['issues'] and z-start <= MAX_TABLE_CHARACTERS,
+                 qa_usable=not t['issues'] and bool(t['header_rows']) and z-start <= MAX_TABLE_CHARACTERS,
                  continuation_of=None, continuation_status='not_requested')
         if continued:
             t['continuation_status'] = 'needs_review'
@@ -278,9 +278,9 @@ def notice(tables):
             line += '；PDF 物理页 '+','.join(map(str, t['physical_pages']))
         line += '；结构检查通过' if t['structure_status'] == 'consistent' else '；结构待核查：'+'、'.join(ISSUES[v] for v in t['issues'])
         if t['header_status'] == 'not_marked':
-            line += '；表头未被识别器明确标记，需结合原表判断'
+            line += '；表头未被识别器明确标记，待原页核查，暂不用于 AI 结论'
         line += '；数值和单位尚未对照 PDF 原页核验'
-        if not t['qa_usable'] and not t['issues']:
+        if t['char_end']-t['evidence_start'] > MAX_TABLE_CHARACTERS:
             line += '；表格过长，仅提供原表定位，暂不生成表内数值回答'
         if t['continuation_of']:
             line += '；明确续接 '+t['continuation_of']+'（各片段分别保留）'

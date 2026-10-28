@@ -132,9 +132,9 @@ def validate_draft(draft, source):
             require(entry.get('source') in ('original', 'excerpts'), 'filename or clarification cannot substantiate knowledge')
             located = quote(entry, source)
             if entry['source'] == 'original':
-                require(not any(t['structure_status'] == 'needs_review'
+                require(not any(t['structure_status'] == 'needs_review' or t['header_status'] != 'explicit'
                     for t in table_evidence.context_for(table_record['tables'], located['start'], located['end'])),
-                    'claim cites a table with unresolved structure; retain original and describe limitation')
+                    'claim cites a table with unresolved structure or header; retain original and describe limitation')
         for condition in items(claim['conditions'], limit=40):
             text(condition, limit=2000)
         claims[claim['id']] = claim
@@ -245,7 +245,7 @@ def request(purpose, source, rules, draft=None):
         value['instruction'] += ('table_analysis 是对原文 HTML 表格的程序结构检查，不是原件数值核验。'
             '解读表格必须同时核对表头、行名、单位、表注、合并单元格、正负号、小数点及百分比；空白、破折号和零不等价。'
             '保留原表文字，禁止补齐缺失数值、无依据的单位换算或拼接续表。'
-            '结构 needs_review 的表格保留原文和限制，不以其中的单元格内容支撑 claims；其他正文仍可正常整理。'
+            '结构 needs_review 或 header_status=not_marked 的表格保留原文和限制，不以其中的单元格内容支撑 claims；其他正文仍可正常整理。'
             '没有原页核验时，不声称表格 OCR 数值已验证；将这一边界写进 limitations 和 review_scope。')
     if draft is not None:
         value.update(draft=draft, draft_sha256=sha(draft))

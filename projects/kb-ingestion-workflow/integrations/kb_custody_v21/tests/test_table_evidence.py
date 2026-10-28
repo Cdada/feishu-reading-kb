@@ -172,6 +172,22 @@ class TableArchiveAndQATests(unittest.TestCase):
         with self.assertRaises(ContractError):
             validate(dict(status='grounded', claims=[dict(text='不能引用', evidence=[dict(evidence_id=hit['evidence_id'], quote='<table>')])], gaps=[]), [hit])
 
+    def test_rectangular_table_without_explicit_headers_requires_original_review(self):
+        raw = table().replace('<th>', '<td>').replace('</th>', '</td>')
+        record = tables.inventory(raw)['tables'][0]
+        self.assertEqual(record['structure_status'], 'consistent')
+        self.assertEqual(record['header_status'], 'not_marked')
+        self.assertFalse(record['qa_usable'])
+        self.assertNotIn('表格过长', tables.notice([record]))
+        s, draft = sample()
+        s['original'] += '\n\n'+raw
+        draft['claims'][0]['evidence'] = [dict(source='original', quote='<td>合成甲区</td><td>−12.50</td>')]
+        with self.assertRaisesRegex(ContractError, 'unresolved structure or header'):
+            validate_draft(draft, s)
+        self.index.sync(Provider(source(text=raw)))
+        hit = self.index.search('合成甲区')[0]
+        with self.assertRaises(ContractError): request(dict(hits=[hit]))
+
     def test_reading_models_receive_table_limits_and_invalid_cells_cannot_be_claims(self):
         s, draft = sample()
         s['original'] += '\n\n<table><tr><th>城市测量</th><th>面积</th></tr><tr><td>合成甲区</td></tr></table>'

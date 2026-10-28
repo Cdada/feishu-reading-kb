@@ -20,7 +20,7 @@ from .qa_answer_contract import INSTRUCTION, validate
 
 def request(plan):
     if any(not t['qa_usable'] for h in plan['hits'] for t in h.get('table_context', [])):
-        raise ContractError('待核查或过长的表格只提供原表定位，本次不生成数值回答。')
+        raise ContractError('结构、表头待核查或过长的表格只提供原表定位，本次不生成数值回答。')
     if sum(len(h['text']) for h in plan['hits']) > 24000:
         raise ContractError('检索片段超过本次回答容量，请缩小问题范围。')
     keys = ('evidence_id', 'material_id', 'title', 'text', 'is_paper', 'publication_year', 'completeness', 'content_nature')
