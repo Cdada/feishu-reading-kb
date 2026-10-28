@@ -135,5 +135,27 @@ def rewrite_images(content, mapping, replacements):
                     block.update(char_start=translate(block['char_start']), char_end=translate(block['char_end']))
                     block['sha256'] = sha(result_text[block['char_start']:block['char_end']].encode())
                 checked_blocks(revised, result_text)
+    if 'document_structure' in mapping and output != content:
+        structure = revised['document_structure']
+        if structure['output_sha256'] != sha(content):
+            raise ContractError('office structure no longer matches image input')
+        def translate_structure(position):
+            delta = 0
+            for edit in transformed:
+                a, b = edit['old_range']
+                if a < position < b:
+                    raise ContractError('image edit crosses a document structure boundary')
+                if b <= position:
+                    c, d = edit['new_range']; delta += d-c-(b-a)
+            return position+delta
+        new_text = output.decode('utf-8')
+        for loc in structure['locations']:
+            a, b = loc['char_start'], loc['char_end']
+            if sha(text[a:b].encode()) != loc['sha256']:
+                raise ContractError('office structure location changed')
+            loc.update(char_start=translate_structure(a), char_end=translate_structure(b))
+            loc['sha256'] = sha(new_text[loc['char_start']:loc['char_end']].encode())
+        structure['output_sha256'] = sha(output)
+        revised['locator_precision'] = 'document_structure'
     revised['image_mappings'] = mapped
     return output, revised

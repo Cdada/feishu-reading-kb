@@ -68,7 +68,7 @@ def validate_metadata(value):
 def render_metadata(record, mapping, policy, assets, publication, *, classification, privacy):
     summary = {key: mapping[key] for key in ('extraction_id','source_asset_id','output_asset_id','extractor','extractor_version','mode','extracted_at')}
     summary.update(map_path='提取/extraction-map.json',text_extraction_status='completed',
-                   ocr_status=dict(execution='not_used' if mapping['mode'] in {'text_direct','webarchive_offline','markdown_bundle_offline'} else 'unknown',quality='not_assessed',issues=[]),
+                   ocr_status=dict(execution='not_used' if mapping['mode'] in {'text_direct','webarchive_offline','markdown_bundle_offline','custody_office_document_v1'} else 'unknown',quality='not_assessed',issues=[]),
                    figure_status=dict(inventory='unknown',extracted_count=policy['unique_image_count']),
                    table_status=dict(inventory='unknown',extraction='unknown',reading='not_read'))
     value = dict(schema_version='kb-source-group/v2.1',source_record=deepcopy(record),raw_asset_id=mapping['source_asset_id'],

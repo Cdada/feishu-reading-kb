@@ -74,7 +74,7 @@ def render_evidence(output, hits):
     lines.extend(citation(by_id[key], materials.index(by_id[key]['material_id'])+1) for key in cited)
     lines.append('引文已逐字校验；概括由 AI 生成，判断适用性时请核对原文上下文。')
     if any(h.get('table_context') for h in hits):
-        lines.append('表格引文只与提取文本核对；数字、单位和表头尚未与 PDF 原页逐项核验。')
+        lines.append('表格引文只与提取文本核对；数字、单位和表头尚未与原始文件逐项核验。')
     return '\n\n'.join(lines)
 
 
@@ -131,7 +131,7 @@ def render_answer(output, hits, selected=()):
         lines.append('['+str(materials.index(key)+1)+'] '+title+pages)
     lines.append('完整主张、引文及定位可点击“查看原文依据”。概括由 AI 生成，引文已逐字核对。')
     if any(h.get('table_context') for h in hits):
-        lines.append('表格数值尚未对照 PDF 原页核验，请通过“查看原文依据”核对表名、物理页码和单位。')
+        lines.append('表格数值尚未对照原始文件核验，请通过“查看原文依据”核对表名、原始位置和单位。')
     return '\n\n'.join(lines)
 
 

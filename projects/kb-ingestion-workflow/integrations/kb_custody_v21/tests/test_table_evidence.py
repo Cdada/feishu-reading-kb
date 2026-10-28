@@ -49,7 +49,7 @@ class TableInventoryTests(unittest.TestCase):
             self.assertTrue(raw_cell.startswith('<'+cell['tag']))
             self.assertTrue(raw_cell.endswith('</'+cell['tag']+'>'))
         self.assertEqual(text[result['char_start']:result['char_end']], raw)
-        self.assertEqual(result['content_verification'], 'not_checked_against_pdf')
+        self.assertEqual(result['content_verification'], 'not_checked_against_original')
 
     def test_code_examples_are_not_tables_and_multiple_tables_keep_positions(self):
         text = '```html\n'+table()+'\n```\n\n'+table()+'\n\n'+table('0')
@@ -133,7 +133,7 @@ class TableArchiveAndQATests(unittest.TestCase):
         record = json.loads(files[group+'/入库依据/提取/tables.json'])
         self.assertEqual(record['source_sha256'], hashlib.sha256(s['original'].encode()).hexdigest())
         self.assertIn('表格目录', files[group+'/来源卡片.md'].decode())
-        self.assertIn('尚未对照 PDF', files[group+'/表格目录.md'].decode())
+        self.assertIn('尚未对照原始文件', files[group+'/表格目录.md'].decode())
         self.assertIn('&lt;td&gt;', files[group+'/文章客观整理.md'].decode())
 
     def test_whole_table_survives_the_old_900_character_boundary_and_exact_reverification(self):
@@ -159,7 +159,7 @@ class TableArchiveAndQATests(unittest.TestCase):
         self.assertEqual(packet['evidence'][0]['table_context'][0]['physical_pages'], [3])
         output = dict(status='grounded', claims=[dict(text='合成甲区为 12.5 km²（待核对原页）。',
                        evidence=[dict(evidence_id=hit['evidence_id'], quote='<td>合成甲区</td><td>12.5</td>')])], gaps=[])
-        self.assertIn('尚未与 PDF 原页', render_evidence(output, [hit]))
+        self.assertIn('尚未与原始文件', render_evidence(output, [hit]))
 
     def test_oversize_values_remain_searchable_but_no_partial_rows_go_to_the_model(self):
         raw = table()[:-8]+''.join('<tr><td>合成条目'+str(i)+'</td><td>17.25</td></tr>' for i in range(500))+'</table>'

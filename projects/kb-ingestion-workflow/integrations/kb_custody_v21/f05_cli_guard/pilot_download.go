@@ -38,7 +38,7 @@ func knownPilotDownload(c Control, p pilotSession) bool {
 	}
 	switch strings.ToLower(filepath.Ext(d.Filename)) {
 	case ".md", ".txt", ".pdf", ".webarchive":
-	case ".zip":
+	case ".zip", ".docx", ".xlsx":
 		if d.Reference != inboxDownloadReference {
 			return false
 		}

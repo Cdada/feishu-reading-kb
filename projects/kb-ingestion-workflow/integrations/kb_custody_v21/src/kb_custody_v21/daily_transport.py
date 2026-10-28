@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from .document_formats import daily_formats, unsupported_message
 import subprocess
 
 from .contracts import ContractError, stable_key
@@ -184,7 +185,7 @@ class DailyTransport:
             daily_parent=dict(rules_path=str(a.path), rules_sha256=a.digest, reservation_path=str(reservation_path)))
         if download and download.get('reference')=='P19-inbox-download-v1':
             approval.update(operation='receive-inbox', inbox=dict(reference='P19-inbox-v1',
-                formats=['.md','.webarchive'] + (['.pdf'] if 'pdf' in a.config else []),
+                formats=daily_formats(a.config),
                 max_asset_bytes=a.policy.max_asset_bytes, max_files=1))
         approval_path = root/'approval.local.json'
         durable_file(approval_path, approval)

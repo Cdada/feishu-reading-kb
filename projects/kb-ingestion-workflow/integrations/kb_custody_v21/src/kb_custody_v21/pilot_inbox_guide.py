@@ -7,6 +7,7 @@ coverage; neither profile bypasses technical review or authorizes image calls.
 """
 import json
 from pathlib import Path
+from .document_formats import OFFICE_PROFILE, OFFICE_FORMATS
 import re
 
 from .content import ReadingGuideAdapter, empty_record
@@ -36,9 +37,9 @@ class PilotInboxGuide:
         fields={'reference','legacy_catalog','formats','max_body_bytes','max_characters',
                 'metadata_policy','policy','font_path','account_sha256','wait_seconds',
                 'minimum_remaining_percent'}
-        self.preserves_images = p.get('reference') in {'P27-three-format-guide-v1', 'P33-pdf-guide-v1'}
-        formats = ['.md','.webarchive','.pdf'] if p.get('reference') == 'P33-pdf-guide-v1' else ['.md','.zip','.webarchive'] if self.preserves_images else ['.md','.txt']
-        if (set(p) != fields or p['reference'] not in {'P21-new-material-guide-v1','P27-three-format-guide-v1','P33-pdf-guide-v1'}
+        self.preserves_images = p.get('reference') in {'P27-three-format-guide-v1', 'P33-pdf-guide-v1', OFFICE_PROFILE}
+        formats = OFFICE_FORMATS if p.get('reference') == OFFICE_PROFILE else ['.md','.webarchive','.pdf'] if p.get('reference') == 'P33-pdf-guide-v1' else ['.md','.zip','.webarchive'] if self.preserves_images else ['.md','.txt']
+        if (set(p) != fields or p['reference'] not in {'P21-new-material-guide-v1','P27-three-format-guide-v1','P33-pdf-guide-v1', OFFICE_PROFILE}
                 or p['formats'] != formats or p['metadata_policy'] != 'filename-provisional-v1'
                 or type(p['max_body_bytes']) is not int or not 1 <= p['max_body_bytes'] <= 1024*1024
                 or type(p['max_characters']) is not int or not 1 <= p['max_characters'] <= 200000
@@ -48,7 +49,7 @@ class PilotInboxGuide:
                 or not isinstance(p['policy'],dict)):
             raise ContractError('explicit bounded text-only derivation policy required')
         if self.preserves_images: validate_preservation_policy(p['policy'])
-        if p['reference'] != 'P33-pdf-guide-v1' and p['policy'].get('reference') == 'P33-preserve-originals-v1':
+        if p['reference'] not in {'P33-pdf-guide-v1', OFFICE_PROFILE} and p['policy'].get('reference') == 'P33-preserve-originals-v1':
             raise ContractError('larger PDF image preservation requires the explicit PDF guide profile')
         validate_catalog(p['legacy_catalog'])
         self.font=no_symlinks(Path(p['font_path']).absolute())

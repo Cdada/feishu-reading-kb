@@ -11,6 +11,7 @@ import signal
 import subprocess
 import time
 from pathlib import Path
+from .document_formats import daily_formats, unsupported_message
 
 from .contracts import ContractError, stable_key
 from .daily_store import Deferred
@@ -48,7 +49,7 @@ class MaterialGrant(PilotExecutionSession):
                 root=str(self.root),operation='inbox-service',**authority.policy.scope,
                 starts_at=now.isoformat(),expires_at=(now+timedelta(hours=10)).isoformat(),
                 run_plan=str(self.run_path),guide_plan=str(guide),limits=dict(download=2),
-                inbox=dict(reference='P23-service-inbox-v1',formats=['.md','.webarchive'] + (['.pdf'] if 'pdf' in authority.config else []),
+                inbox=dict(reference='P23-service-inbox-v1',formats=daily_formats(authority.config),
                     max_asset_bytes=authority.policy.max_asset_bytes,max_files=1),
                 new_material_guide=dict(reference='P23-service-guide-v1',plan_sha256=file_sha(guide),max_business_turns=1)))
         self.approval=json.loads(self.session.read_bytes())

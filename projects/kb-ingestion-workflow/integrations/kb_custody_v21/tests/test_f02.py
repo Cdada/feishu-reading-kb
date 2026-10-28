@@ -330,7 +330,7 @@ class F02Tests(unittest.TestCase):
         self.assertEqual(self.wire.request.call_count, 36)
         self.assertEqual(sum(LIMITS.values()), 38)
         self.assertEqual(result['transport_sha256'], {k: sha(v) for k, v in self.frozen.items()})
-        self.assertEqual(result['conversions']['fixture.txt']['status'], 'needs_review')
+        self.assertEqual(result['conversions']['fixture.txt']['status'], 'ready_candidate')
         self.assertEqual(result['conversions']['fixture.md']['status'], 'ready_candidate')
         self.assertEqual(result['end_to_end'], 'NOT_RUN')
         for kind, maximum in LIMITS.items():

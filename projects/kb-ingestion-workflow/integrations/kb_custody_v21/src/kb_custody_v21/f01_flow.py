@@ -19,7 +19,7 @@ from .staging import Staging
 
 TXT = '街道树荫影响步行路线。\n这是一份合成测试材料。\n'.encode()
 MD = '# 合成验收材料\n\n街道树荫影响步行路线。\n这份文字只用于独立测试群的文件传输验证。\n'.encode()
-NOTIFICATIONS = ['合成 TXT 已在独立 DEV 接管；转换因正文偏短需人工复核，未入库。',
+NOTIFICATIONS = ['合成 TXT 已在独立 DEV 接管并完成本地转换，尚未确认入库。',
                  '合成 Markdown 已在独立 DEV 接管并完成本地转换。']
 PNG_SHA = '46c334467255ae9564c13280118776f5daf9d3985f7fb6bc183a8ed354a2fbf6'
 
@@ -65,13 +65,13 @@ def convert_download(worktree, root, name, data, message):
     task = conversion.submit(inspected['inspection_id'], 'F01-' + name)
     conversion.worker.run_once()
     converted = conversion.service.ledger.get_task(task['task_id'])
-    expected_status = 'needs_review' if name == 'fixture.txt' else 'ready_candidate'
+    expected_status = 'ready_candidate'
     if converted['status'] != expected_status:
         raise ContractError('synthetic conversion differs from expected quality gate')
     mapping = json.loads(converted['quality_json'])['extraction']
     _, _, extraction = conversion.extraction(mapping['extraction_id'])
     body = (extraction / 'source.md').read_bytes()
-    expected_body = b'# fixture\n\n' + TXT if name == 'fixture.txt' else MD
+    expected_body = ('# TXT 正文\n\n> 系统说明：按 utf-8-sig 解码；正文按纯文本保留。\n\n街道树荫影响步行路线。\n\n这是一份合成测试材料。\n\n\n\n'.encode() if name == 'fixture.txt' else MD)
     if body != expected_body:
         raise ContractError('conversion changed the frozen synthetic body')
     return body, {'entry_id': row['entry_id'], 'mapping': mapping,

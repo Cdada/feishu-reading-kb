@@ -10,7 +10,7 @@ import re
 
 from markdown_it import MarkdownIt
 
-VERSION = 'table-evidence-v1'
+VERSION = 'table-evidence-v2'
 MAX_TABLE_CHARACTERS = 12000
 MAX_CELLS = 4000
 MAX_GRID = 16000
@@ -232,7 +232,7 @@ def inventory(text, pages=(), excluded_ranges=()):
             start, caption, number, continued = a, '', '', False
         t.update(id=f'T{i+1:03d}', evidence_start=start, caption=caption, number=number,
                  continued=continued, physical_pages=page_numbers(pages, a, z),
-                 sha256=digest(text[a:z]), content_verification='not_checked_against_pdf',
+                 sha256=digest(text[a:z]), content_verification='not_checked_against_original',
                  header_status='explicit' if t['header_rows'] else 'not_marked',
                  structure_status='needs_review' if t['issues'] else 'consistent',
                  qa_usable=not t['issues'] and bool(t['header_rows']) and z-start <= MAX_TABLE_CHARACTERS,
@@ -278,8 +278,8 @@ def notice(tables):
             line += '；PDF 物理页 '+','.join(map(str, t['physical_pages']))
         line += '；结构检查通过' if t['structure_status'] == 'consistent' else '；结构待核查：'+'、'.join(ISSUES[v] for v in t['issues'])
         if t['header_status'] == 'not_marked':
-            line += '；表头未被识别器明确标记，待原页核查，暂不用于 AI 结论'
-        line += '；数值和单位尚未对照 PDF 原页核验'
+            line += '；表头未明确标记，待原件核查，暂不用于 AI 结论'
+        line += '；数值和单位尚未对照原始文件核验'
         if t['char_end']-t['evidence_start'] > MAX_TABLE_CHARACTERS:
             line += '；表格过长，仅提供原表定位，暂不生成表内数值回答'
         if t['continuation_of']:

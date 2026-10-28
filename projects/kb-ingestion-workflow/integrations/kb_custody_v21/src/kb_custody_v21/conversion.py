@@ -89,8 +89,8 @@ class CustodyConversion:
 
     def inspect(self, entry_id):
         entry = self._ready(entry_id)
-        if Path(entry['safe_filename']).suffix.lower() not in {'.md', '.txt', '.webarchive', '.pdf', '.zip'}:
-            raise ContractError('DEV local routes: Markdown, TXT, webarchive, Markdown bundle, PDF text layer; other converters require separate validation')
+        if Path(entry['safe_filename']).suffix.lower() not in {'.md', '.txt', '.webarchive', '.pdf', '.zip', '.docx', '.xlsx'}:
+            raise ContractError('Supported local routes: Markdown, TXT, DOCX, XLSX, webarchive, Markdown bundle and PDF; legacy DOC/XLS require conversion first')
         with self.staging.input_binding(entry_id, 'conversion_inspection') as binding:
             self._active_paths[entry_id] = Path(binding['path'])
             try:
@@ -127,6 +127,9 @@ class CustodyConversion:
 
     def _process_markdown(self, task, inspection, batch):
         entry = self.registry.entry(inspection['source_relpath'])
+        if Path(entry['safe_filename']).suffix.lower() in {'.txt', '.docx', '.xlsx'}:
+            from .office_ingestion import stage_document
+            return stage_document(self, entry, batch)
         if inspection['route'] == 'pdf_mineru_local':
             from .mineru_ingestion import stage_pdf_result
             if self.pdf_result is None:
@@ -178,7 +181,7 @@ class CustodyConversion:
             raise ContractError('conversion did not produce one completed source')
         primary = rows[0]['primary_input']
         if (rows[0].get('group_role') == 'main_markdown' or
-                rows[0].get('conversion_method') in {'custody_embedded_markdown_v1', 'custody_mineru_pdf_v1'}):
+                rows[0].get('conversion_method') in {'custody_embedded_markdown_v1', 'custody_mineru_pdf_v1', 'custody_office_document_v1'}):
             # Existing V1 wraps its main Markdown in a generated package with
             # operational prose. The actual body is retained as an auxiliary.
             originals = [p.strip() for p in rows[0]['auxiliary_input'].split(';') if p.strip().endswith('.md')]
@@ -247,7 +250,7 @@ class CustodyConversion:
             by_target[target] = aid
             inventory.append({'asset_id': aid, 'relative_path': copied.relative_to(root).as_posix(),
                               'original_target': target, 'sha256': sha(data), 'size_bytes': len(data),
-                              'role': 'extracted_original' if linked and inspection['route'] in {'text_direct','webarchive_offline','markdown_bundle_offline','pdf_mineru_local'} else 'unclassified',
+                              'role': 'extracted_original' if linked and inspection['route'] in {'text_direct','webarchive_offline','markdown_bundle_offline','pdf_mineru_local','docx_direct','xlsx_direct'} else 'unclassified',
                               'source_page_index': pdf_images[target]['page_index'] if target in pdf_images else None})
         mapping = dict(schema_version='kb-extraction-map/v2.1', extraction_id=extraction_id,
             source_asset_id=entry['asset_id'], output_asset_id=output_asset_id,
@@ -259,6 +262,9 @@ class CustodyConversion:
             image_mappings=[], transformations=[], issues=['No trustworthy page mapping supplied by collector.'])
         if page_map is not None:
             mapping.update(page_map)
+        if rows[0].get('conversion_method') == 'custody_office_document_v1':
+            from .office_ingestion import checked_document_map
+            mapping.update(checked_document_map(self, entry, source, text))
         if image_availability is not None:
             from . import embedded_markdown
             mapping.update(extractor='custody-embedded-markdown',

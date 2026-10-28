@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from .document_formats import daily_formats, unsupported_message
 import threading
 import uuid
 
@@ -331,9 +332,9 @@ class DailyBackend:
     def _receive(self, document):
         mid=document['message_id']
         name=document['filename']
-        supported = {'.md','.webarchive'} | ({'.pdf'} if self.pdf_converter is not None else set())
+        supported = set(daily_formats(self.authority.config))
         if Path(name).suffix.lower() not in supported:
-            raise MaterialProblem('当前支持 Markdown、Safari 网页归档'+('和论文 PDF。' if self.pdf_converter is not None else '；PDF 接入尚未启用。'),'resend_supported_file')
+            raise MaterialProblem(unsupported_message(self.authority.config),'resend_supported_file')
         self.notice('registered:'+mid,'已登记“'+name+'”，正在等待保存原件。')
         item,detail,listed=self.collector.message(mid)
         if item.get('msg_type')!='file' or item.get('deleted') is not False:
@@ -426,6 +427,9 @@ class DailyBackend:
         if state['processing_state']=='needs_recovery':
             return self._recover_conversion(document,state['task_id'])
         if state['processing_state']!='ready_candidate':
+            problems=self.registry.rows("SELECT payload_json FROM custody_events WHERE aggregate_id=? AND event_type='office_conversion_blocked' ORDER BY rowid DESC", (document['entry_id'],))
+            if problems:
+                raise MaterialProblem(json.loads(problems[0]['payload_json'])['message'])
             raise MaterialProblem('转换结果需要检查，原件已保存。')
         task=self.intake.conversion.service.ledger.get_task(state['task_id'])
         extraction=json.loads(task['quality_json'])['extraction']['extraction_id']
@@ -437,7 +441,7 @@ class DailyBackend:
         if document['phase']=='model_unknown':
             return self._recover_model(document)
         if document['phase']=='converted':
-            if Path(document['filename']).suffix.lower() == '.pdf':
+            if Path(document['filename']).suffix.lower() in {'.pdf', '.txt', '.docx', '.xlsx'}:
                 self._pdf_guide_bounds(document)
             images=availability(self.intake.conversion,document['data']['extraction_id'])
             if images and not images['decision']:
@@ -485,13 +489,13 @@ class DailyBackend:
         policy = profile['policy']
         if (len(images) > policy['max_images']
                 or sum(i['size_bytes'] for i in images) > policy['max_total_bytes']):
-            raise MaterialProblem('论文图片超过本次完整保留范围；原件和转换结果已保存，请交 Codex 接续。')
+            raise MaterialProblem('资料图片超过本次完整保留范围；原件和转换结果已保存，请交 Codex 接续。')
         # Image-policy output names are bounded; reserve space for rewriting
         # references so a near-limit body cannot consume a turn then fail.
         margin = len(images) * 160
         if (not text.strip() or len(body)+margin > profile['max_body_bytes']
                 or len(text)+margin > profile['max_characters']):
-            raise MaterialProblem('论文正文超过本次完整导读范围；所有页面已保存，请交 Codex 接续。')
+            raise MaterialProblem('资料正文超过本次完整导读范围；完整转换结果已保存，请交 Codex 接续。')
 
     def _model_child(self,document):
         attempt=document['data']['model_attempt']

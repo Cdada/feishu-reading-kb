@@ -201,7 +201,7 @@ class PilotIntake:
                         AND (r.status!='accepted' OR f.custody_health!='healthy')''',
                         (g['source_group_id'],g['membership_revision'])) for g in memberships):
                         continue
-                    if Path(entry['safe_filename']).suffix.lower() not in {'.md','.txt','.webarchive','.pdf','.zip'}:
+                    if Path(entry['safe_filename']).suffix.lower() not in {'.md','.txt','.webarchive','.pdf','.zip', '.docx', '.xlsx'}:
                         self._stop(eid, 'custody_only')
                         continue
                     existing = self.conversion.service.ledger.get_task_by_idempotency(

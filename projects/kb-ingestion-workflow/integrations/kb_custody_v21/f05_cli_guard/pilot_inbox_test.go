@@ -464,3 +464,36 @@ func TestWebarchiveRequiresExplicitInboxFormat(t *testing.T) {
 		t.Fatal("existing MD/PDF permission admitted a WebArchive")
 	}
 }
+
+func TestOfficeFormatsRequireExplicitInboxGrant(t *testing.T) {
+	for _, ext := range []string{".docx", ".xlsx"} {
+		for _, allowed := range []bool{false, true} {
+			t.Run(ext+fmt.Sprint(allowed), func(t *testing.T) {
+				c := inboxControl(t, "synthetic"+ext)
+				if allowed { changeInboxApproval(t, &c, func(p *pilotSession) { p.Inbox.Formats = []string{".md", ext} }) }
+				g, err := NewGuard(c, time.Now)
+				if allowed && err != nil { t.Fatal(err) }
+				if !allowed && err == nil { g.Close(); t.Fatal("old grant accepted Office attachment") }
+				if g != nil { g.Close() }
+			})
+		}
+	}
+}
+
+func TestOfficeDownloadMediaTypes(t *testing.T) {
+	for ext, media := range map[string]string{
+		".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+		".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+	} {
+		t.Run(ext, func(t *testing.T) {
+			c := inboxControl(t, "synthetic"+ext)
+			changeInboxApproval(t, &c, func(p *pilotSession) { p.Inbox.Formats = []string{ext} })
+			g := guard(t, c); defer g.Close()
+			after, err := g.PreRoundTripE(get(c)); if err != nil { t.Fatal(err) }
+			r := response(200, pilotSyntheticFile); r.Header.Set("Content-Type", media)
+			r.ContentLength = int64(len(pilotSyntheticFile)); after(r, nil); r.Body.Close()
+			if g.failed { t.Fatal("approved Office transport rejected") }
+			if _, _, ok := inboxReceivedEvidence(c); !ok { t.Fatal("missing byte receipt") }
+		})
+	}
+}

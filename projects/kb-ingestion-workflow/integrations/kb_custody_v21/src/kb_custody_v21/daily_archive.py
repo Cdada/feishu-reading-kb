@@ -6,6 +6,7 @@ then shares the ordinary file queue and preview approval; no second AI worker.
 import hashlib
 import json
 from pathlib import Path
+from .document_formats import daily_formats, unsupported_message
 import re
 
 from .contracts import ContractError, stable_key
@@ -140,9 +141,9 @@ class ArchiveMentions:
                     raise MaterialProblem('请回复你在本群发送的原始附件；当前引用的消息不是可归档文件。')
                 metadata = bounded_json(target.get('body', {}).get('content'), 4096)
                 name = metadata.get('file_name') if isinstance(metadata, dict) else None
-                supported = {'.md', '.webarchive'} | ({'.pdf'} if 'pdf' in self.b.authority.config else set())
+                supported = set(daily_formats(self.b.authority.config))
                 if not isinstance(name, str) or not name or len(name.encode()) > 900 or Path(name).suffix.lower() not in supported:
-                    raise MaterialProblem('该附件格式尚未支持，请使用当前服务支持的 Markdown、网页归档或已启用的 PDF。')
+                    raise MaterialProblem(unsupported_message(self.b.authority.config))
                 self._observe(target, target_proof, register=True)
                 document = self.store.document(parent)
                 phase = document['phase']

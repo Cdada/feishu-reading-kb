@@ -37,7 +37,7 @@ def inbox_policy(session):
             or not isinstance(p, dict) or set(p) != {'reference', 'formats', 'max_asset_bytes', 'max_files'}
             or p['reference'] != ('P23-service-inbox-v1' if service else 'P22-daily-inbox-v1' if daily else 'P19-inbox-v1')
             or not isinstance(p['formats'], list) or not p['formats']
-            or any(not isinstance(x, str) or x not in {'.md', '.txt', '.pdf', '.webarchive', '.zip'} for x in p['formats'])
+            or any(not isinstance(x, str) or x not in {'.md', '.txt', '.pdf', '.webarchive', '.zip', '.docx', '.xlsx'} for x in p['formats'])
             or len(set(p['formats'])) != len(p['formats'])
             or type(p['max_asset_bytes']) is not int or not 0 < p['max_asset_bytes'] <= FILE_LIMIT
             or type(p['max_files']) is not int or not 1 <= p['max_files'] <= 6

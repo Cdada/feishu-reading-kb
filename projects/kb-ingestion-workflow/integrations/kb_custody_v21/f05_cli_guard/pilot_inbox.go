@@ -60,7 +60,7 @@ func validPilotDownloadBinding(c Control, p pilotSession) bool {
 		}
 		seen[ext] = true
 		switch ext {
-		case ".md", ".txt", ".pdf", ".webarchive", ".zip":
+		case ".md", ".txt", ".pdf", ".webarchive", ".zip", ".docx", ".xlsx":
 		default:
 			return false
 		}
@@ -130,7 +130,7 @@ func inboxMediaType(value string) bool {
 		return false
 	}
 	switch media {
-	case "application/octet-stream", "application/pdf", "text/plain", "text/markdown", "application/x-webarchive", "application/x-safari-webarchive", "application/zip", "application/x-zip-compressed":
+	case "application/octet-stream", "application/pdf", "text/plain", "text/markdown", "application/x-webarchive", "application/x-safari-webarchive", "application/zip", "application/x-zip-compressed", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
 		return true
 	}
 	return false

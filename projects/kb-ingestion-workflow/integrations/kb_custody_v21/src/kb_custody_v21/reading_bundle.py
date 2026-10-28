@@ -182,7 +182,7 @@ def build_bundle(source, draft, review, *, assets, date, existing_files):
         inventory_path = group+'/入库依据/提取/tables.json'
         require(inventory_path not in files, 'duplicate table inventory path')
         files[inventory_path] = (encoded(tables)+'\n').encode()
-        body = '# 表格目录\n\n结构检查只检查识别结果的行列关系，不证明数字、单位和表头与原 PDF 相同。\n\n'
+        body = '# 表格目录\n\n结构检查只检查识别结果的行列关系，不证明数字、单位和表头与原始文件相同。\n\n'
         for table in tables['tables']:
             body += '## '+table['id']+'\n\n'+label(table_evidence.notice([table]))+'\n\n'
             body += link(path, group+'/原文.md', '查看完整提取原文')+f"；原文字符 {table['char_start']}–{table['char_end']}\n\n"
