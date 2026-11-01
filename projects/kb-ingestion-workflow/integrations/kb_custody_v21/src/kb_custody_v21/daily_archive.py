@@ -165,6 +165,11 @@ class ArchiveMentions:
                 else:
                     text = '已收到归档请求，正在进入处理队列。已有任务时会依次处理；内存、资料盘或额度不足时暂停并保留记录。导读完成后仍需你确认入库。'
                 self.store.put('archive-request:'+parent, dict(command_id=mid, phase=phase, at=self.store.now()))
+                main=getattr(self.b,'main_cards',None)
+                if main is not None and main.handles(parent):
+                    with self.store.transaction() as db:
+                        db.execute("UPDATE daily_archive_inbox SET state='main_responding',result=? WHERE message_id=?", (parent,mid))
+                    return
             except MaterialProblem as error:
                 text = str(error)
             except Deferred as error:
@@ -183,13 +188,21 @@ class ArchiveMentions:
 
     def drain(self):
         self.b.check_authorization()
-        for row in self.store.rows("SELECT * FROM daily_archive_inbox WHERE state IN ('pending','responding') AND available<=? ORDER BY created,message_id LIMIT 4", (self.store.now(),)):
+        for row in self.store.rows("SELECT * FROM daily_archive_inbox WHERE state IN ('pending','responding','main_responding') AND available<=? ORDER BY created,message_id LIMIT 4", (self.store.now(),)):
             if self.b.stop.is_set():
                 return
             try:
                 if row['state'] == 'pending':
                     self._prepare(row)
                 fresh = self.store.rows('SELECT * FROM daily_archive_inbox WHERE message_id=?', (row['message_id'],))[0]
+                if fresh['state']=='main_responding':
+                    self.b.main_cards.report_one(fresh['result'],force=True)
+                    state=self.b.main_cards.state(fresh['result'])
+                    if state and (state.get('receipt') or state.get('fallback')):
+                        if self.store.timing is not None:
+                            self.store.timing.mark(fresh['result'],'archive_command',dict(observed_at=row['created']))
+                        with self.store.transaction() as db:
+                            db.execute("UPDATE daily_archive_inbox SET state='processed' WHERE message_id=?",(row['message_id'],))
                 if fresh['state'] == 'responding':
                     card = self.b.card_flow.cards.get(fresh['card_id'])
                     if card['state'] == 'prepared':

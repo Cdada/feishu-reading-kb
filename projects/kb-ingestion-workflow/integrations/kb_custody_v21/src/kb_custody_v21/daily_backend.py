@@ -56,6 +56,11 @@ class DailyBackend:
             from .daily_card_events import CardListener
             self.card_flow = CardFlow(self)
             self.card_listener = CardListener(self)
+        self.main_cards = None
+        if 'archive_cards' in authority.config:
+            from .archive_main import MainCards
+            self.main_cards = MainCards(self)
+            store.archive_cards_enabled = True
         self.archive_mentions = None
         if 'archive_mentions' in authority.config:
             from .daily_archive import ArchiveMentions
@@ -152,6 +157,9 @@ class DailyBackend:
         # Stage methods re-read authoritative material records. Saved scheduler
         # phases are hints for selection, never proof of generation/publication.
         self.store.put('stop_requested',False)
+        if self.main_cards is not None:
+            for row in self.store.rows("SELECT key FROM daily_meta WHERE key LIKE 'archive-main-active:%'"):
+                self.store.put(row['key'],None)
         previous=self.registry.rows("""SELECT e.received_filename FROM publications_v21 p
             JOIN publication_confirmations c ON c.publication_id=p.publication_id
             JOIN intake_entries e ON e.entry_id=p.entry_id WHERE p.state='published'
@@ -172,6 +180,8 @@ class DailyBackend:
                 self.notice(key,'资料盘暂不可用，资料处理已暂停。已登记的材料和确认记录保留；请连接原资料盘并检查可用空间。',purpose='service',confirmation=True)
                 self.store.put('reported:'+key,True)
             raise
+        if self.main_cards is not None:
+            self.main_cards.report()
         if self.reading_flow is not None:
             self.reading_flow.report()
         if self.card_flow is not None:
@@ -216,6 +226,8 @@ class DailyBackend:
         registered=self.store.rows("SELECT message_id,filename FROM daily_documents WHERE phase='registered' ORDER BY created,message_id")
         count=0
         for row in registered:
+            if self.main_cards is not None and self.main_cards.handles(row['message_id']):
+                continue
             key='registered:'+row['message_id']
             if self.store.get('reported:'+key):
                 continue
@@ -343,12 +355,15 @@ class DailyBackend:
 
     @timed('save_original')
     def _receive(self, document):
+        if self.main_cards is not None:
+            self.main_cards.activity(document,'正在保存并校验原件。')
         mid=document['message_id']
         name=document['filename']
         supported = set(daily_formats(self.authority.config))
         if Path(name).suffix.lower() not in supported:
             raise MaterialProblem(unsupported_message(self.authority.config),'resend_supported_file')
-        self.notice('registered:'+mid,'已登记“'+name+'”，正在等待保存原件。')
+        if self.main_cards is None or not self.main_cards.handles(mid):
+            self.notice('registered:'+mid,'已登记“'+name+'”，正在等待保存原件。')
         item,detail,listed=self.collector.message(mid)
         if item.get('msg_type')!='file' or item.get('deleted') is not False:
             raise MaterialProblem('原文件消息已不可读取，请补传。','resend_file')
@@ -389,10 +404,13 @@ class DailyBackend:
             self.store.advance(mid,'original_saved','duplicate',data=dict(existing_message_id=canonical))
             self.notice('duplicate:'+mid,'“'+name+'”与已登记原件相同，沿用已有处理记录。')
             return
-        self.notice('custody:'+mid,'“'+name+'”的原件已完整保存，将按队列制作导读。',purpose='custody')
+        if self.main_cards is None or not self.main_cards.handles(mid):
+            self.notice('custody:'+mid,'“'+name+'”的原件已完整保存，将按队列制作导读。',purpose='custody')
 
     @timed('conversion')
     def _convert(self, document):
+        if self.main_cards is not None:
+            self.main_cards.activity(document,'正在解析文档，并检查转换结果。')
         mid=document['message_id']
         # Reconcile a crash between saving the original and its content key.
         if not document['source_sha']:
@@ -401,7 +419,8 @@ class DailyBackend:
             if canonical:
                 self.store.advance(mid,'original_saved','duplicate',data=dict(existing_message_id=canonical))
                 return
-        self.notice('custody:'+mid,'“'+document['filename']+'”的原件已完整保存，将按队列制作导读。',purpose='custody')
+        if self.main_cards is None or not self.main_cards.handles(mid):
+            self.notice('custody:'+mid,'“'+document['filename']+'”的原件已完整保存，将按队列制作导读。',purpose='custody')
         previous=self.registry.rows("""SELECT p.publication_id,p.state FROM publications_v21 p
             JOIN assets a ON a.asset_id=p.source_asset_id WHERE a.sha256=?""",
             (document['source_sha'] or self.registry.entry(document['entry_id'])['sha256'],))
@@ -458,6 +477,8 @@ class DailyBackend:
 
     @timed('guide_preparation')
     def _guide(self, document):
+        if self.main_cards is not None:
+            self.main_cards.activity(document,'正在准备或生成导读，并核对阅读覆盖、引用与格式。')
         mid=document['message_id']
         source=document['source_sha']
         if document['phase']=='model_unknown':
@@ -609,6 +630,8 @@ class DailyBackend:
 
     @timed('preview_delivery')
     def _preview(self, document):
+        if self.main_cards is not None:
+            self.main_cards.activity(document,'正在发送导读 PDF，并核验预览文件。')
         previews=self.pipeline.previews
         pid=document['publication_id']
         row=previews.publisher._row(pid)

@@ -61,6 +61,16 @@ class AuthorityTests(unittest.TestCase):
             self.value['archive_timing']['sample_limit']=limit
             with self.subTest(limit=limit),self.assertRaises(ContractError):DailyAuthority(self.path,self.save())
 
+    def test_main_cards_require_explicit_profile_and_existing_cards(self):
+        self.value['archive_cards']=dict(reference='archive-main-v1',enabled=True)
+        with self.assertRaisesRegex(ContractError,'archive main card profile'):
+            DailyAuthority(self.path,self.save())
+        self.value['cards']=dict(reference='P40-cards-v1',enabled=True)
+        self.assertIsNotNone(DailyAuthority(self.path,self.save()))
+        self.value['archive_cards']['enabled']=False
+        with self.assertRaisesRegex(ContractError,'archive main card profile'):
+            DailyAuthority(self.path,self.save())
+
     def test_explicit_hash_is_required_and_cannot_follow_a_mutation(self):
         digest=self.save()
         self.value['policy']['model_turn_limit']=100

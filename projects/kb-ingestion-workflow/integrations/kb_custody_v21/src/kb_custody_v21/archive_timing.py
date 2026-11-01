@@ -82,11 +82,19 @@ def timed(name, kind='step'):
 def document_step(function):
     @wraps(function)
     def run(backend, document, *args, **kwargs):
-        timing = backend.store.timing
-        if timing is None:
-            return function(backend,document,*args,**kwargs)
-        with timing.step(document['message_id'], document['phase']):
-            return function(backend,document,*args,**kwargs)
+        main=getattr(backend,'main_cards',None)
+        active=main is not None and main.handles(document['message_id'])
+        if active:
+            main.activity(document,'正在核对运行条件与资料完整性。')
+        try:
+            timing = backend.store.timing
+            if timing is None:
+                return function(backend,document,*args,**kwargs)
+            with timing.step(document['message_id'], document['phase']):
+                return function(backend,document,*args,**kwargs)
+        finally:
+            if active:
+                backend.store.put('archive-main-active:'+document['message_id'],None)
     return run
 
 

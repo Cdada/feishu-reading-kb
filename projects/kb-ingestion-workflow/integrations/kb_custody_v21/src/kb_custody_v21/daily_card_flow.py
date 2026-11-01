@@ -57,6 +57,9 @@ class CardFlow:
         event = bounded_json(raw)
         value = bounded_json(event.get('action_value'), 4096)
         card = self.cards.get(value.get('card_id'))
+        main=getattr(self.backend,'main_cards',None)
+        if main is not None and main.action_state(card) is not None:
+            return main.receive(card,event,proof)
         if card['purpose'] == 'qa':
             if self.backend.qa is None:
                 raise ContractError('QA profile disabled')
@@ -86,6 +89,10 @@ class CardFlow:
     def advance(self, document):
         binding, target = self.material(document)
         card = self.cards.prepare(binding, document['filename'])
+        main=getattr(self.backend,'main_cards',None)
+        is_main=main is not None and main.handles(document['message_id'])
+        if is_main:
+            self.store.put('archive-main-action:'+card['card_id'],document['message_id'])
         choices = []
         parents = {binding['target_message_id']}
         if card['message_id']:
@@ -118,6 +125,9 @@ class CardFlow:
                 self.store.put('card-conflict:'+card['card_id'], dict(command=command, at=self.store.now()))
         choice = self.cards.choice(card['card_id'])
         if choice is None:
+            if is_main:
+                main.report_one(document['message_id'],force=True)
+                return
             if card['state'] == 'prepared':
                 listener = getattr(self.backend, 'card_listener', None)
                 if listener is None or not listener.ready:

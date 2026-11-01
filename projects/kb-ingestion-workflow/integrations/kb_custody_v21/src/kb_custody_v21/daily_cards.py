@@ -22,10 +22,14 @@ COMMANDS.update(RELATION_COMMANDS)
 from .qa_cards import COMMANDS as QA_COMMANDS, HEADER as QA_HEADER, checked_fields as qa_fields, commands as qa_commands
 COMMANDS['qa'] = QA_COMMANDS
 COMMANDS['archive_status'] = ()
-HEADERS = dict(HEADERS, qa=QA_HEADER, archive_status='归档收件状态')
+COMMANDS['archive_main'] = ()
+HEADERS = dict(HEADERS, qa=QA_HEADER, archive_status='归档收件状态', archive_main='资料归档')
 
 
 def commands(binding):
+    if binding['purpose']=='archive_main':
+        from .archive_main_contract import actions
+        return actions(binding)
     if binding['purpose']=='qa':
         return qa_commands(binding)
     return relation_commands(binding) if binding['purpose'] in RELATION_COMMANDS else COMMANDS[binding['purpose']]
@@ -79,6 +83,9 @@ def _digest(value):
 def checked_binding(binding):
     if not isinstance(binding, dict) or binding.get('purpose') not in COMMANDS:
         raise ContractError('supported card purpose required')
+    if binding['purpose'] == 'archive_main':
+        from .archive_main_contract import check
+        return check(binding)
     if binding['purpose'] == 'archive_status':
         if (set(binding) != {'purpose','document_id','source_sha256','target_message_id','details'}
                 or not isinstance(binding['details'], str) or not 0 < len(binding['details'].encode()) <= 2048
@@ -124,7 +131,7 @@ def render_card(card, *, result=None):
     title = card['title']
     if not isinstance(title, str) or not title.strip() or len(title.encode()) > 1024:
         raise ContractError('bounded nonempty card title required')
-    if binding['purpose'] in RELATION_COMMANDS or binding['purpose'] in ('qa', 'archive_status'):
+    if binding['purpose'] in RELATION_COMMANDS or binding['purpose'] in ('qa', 'archive_status', 'archive_main'):
         detail = binding['details']
     elif binding['purpose'] == 'preview':
         detail = f"导读第 {binding['preview_version']} 版。请先查看本卡片所回复的导读 PDF，再选择。"
@@ -138,7 +145,7 @@ def render_card(card, *, result=None):
             buttons.append(dict(tag='button', text=dict(tag='plain_text', content=command),
                                 type='primary_filled' if command == commands(binding)[0] else 'default',
                                 width='fill', behaviors=[dict(type='callback', value=dict(
-                                    reference=REFERENCE, card_id=card['card_id'], command=command))]))
+                                    reference=REFERENCE, card_id=(binding['decision']['card_id'] if binding['purpose']=='archive_main' else card['card_id']), command=command))]))
         elements.extend(buttons)
     else:
         if not isinstance(result, str) or not result.strip() or len(result.encode()) > 2048:
@@ -238,7 +245,7 @@ class CardStore:
             checked_access()
             return self._choose(db, card, command, evidence, allow_prepared=True)
 
-    def accept_event(self, raw, evidence, *, app_id, current_binding, checked_access):
+    def accept_event(self, raw, evidence, *, app_id, current_binding, checked_access, main_message_id=None):
         """Admit a checked CLI callback, never an arbitrary caller-made event."""
         checked_access()
         event = bounded_json(raw)
@@ -264,11 +271,11 @@ class CardStore:
                     raise ContractError('event identity reused with different payload')
                 return old['outcome']
             card = self._card(db.execute('SELECT * FROM daily_cards WHERE card_id=?', (cid,)).fetchone())
-            if event.get('message_id') != card['message_id']:
+            if event.get('message_id') != (main_message_id or card['message_id']):
                 raise ContractError('callback does not belong to the delivered card')
             checked_access()
             outcome = ('stale' if card['binding'] != checked_binding(current_binding)
-                       else self._choose(db, card, value['command'], evidence))
+                       else self._choose(db, card, value['command'], evidence, allow_prepared=main_message_id is not None))
             db.execute('INSERT INTO daily_card_events VALUES (?,?,?,?,?)',
                        (event_id, digest, cid, outcome, self.store.now()))
         return outcome

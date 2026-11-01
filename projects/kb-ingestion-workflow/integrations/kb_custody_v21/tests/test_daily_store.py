@@ -45,6 +45,18 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(self.db.summary()['continuing_count'], 8)
         self.assertEqual(self.db.document('om_7')['phase'], 'registered')
 
+    def test_main_card_edit_capacity_does_not_change_legacy_or_request_budgets(self):
+        for purpose,limit in [('preview',20),('archive_main',64)]:
+            for n in range(limit):
+                key=purpose+':'+str(n)
+                self.db.operation(key,'send',dict(mode='card_update',card=dict(message_id='om_'+purpose,binding=dict(purpose=purpose))))
+                attempt=self.db.begin(key)
+                self.db.complete(key,attempt,dict(synthetic=True))
+            key=purpose+':last'
+            self.db.operation(key,'send',dict(mode='card_update',card=dict(message_id='om_'+purpose,binding=dict(purpose=purpose))))
+            with self.assertRaisesRegex(Deferred,'card_update_limit'):self.db.begin(key)
+        self.assertEqual(len(self.db.rows('SELECT * FROM daily_requests')),0)
+
     def test_pagination_restart_preserves_fixed_interval_until_complete(self):
         first = self.db.scan('chat', initial_start=self.time-60)
         self.db.save_page(first, [message(1)], has_more=True, next_token='page2')

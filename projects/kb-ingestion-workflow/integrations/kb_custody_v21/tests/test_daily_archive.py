@@ -111,6 +111,21 @@ class ArchiveTests(unittest.TestCase):
         for text in ('@机器人 归档','@_user_1归档','@_user_1 确认入库','归档 @_user_1','@_user_1 帮我看看'):
             self.assertFalse(archive_command(command(text=text),self.p))
 
+    def test_new_main_task_reuses_one_card_for_repeated_mentions(self):
+        from kb_custody_v21.archive_main import MainCards
+        from kb_custody_v21.daily_card_io import CardDelivery
+        self.store.archive_cards_enabled=True
+        self.backend.card_flow.delivery=CardDelivery(self,self.backend.card_flow.cards)
+        self.backend.collector=SimpleNamespace(observed=lambda mid:(self.items[mid],self.proof('observed-'+mid,dict(code=0,data=dict(items=[self.items[mid]])))))
+        self.backend.main_cards=MainCards(self.backend)
+        self.persist();self.flow.drain()
+        self.assertEqual(self.row()['state'],'processed')
+        self.items['om_again']=command('again')
+        self.persist('om_again','event_again');self.flow.drain()
+        self.assertEqual(self.row('om_again')['state'],'processed')
+        self.assertEqual(sum(x[3].get('mode')=='send' for x in self.calls),1)
+        self.assertEqual(len(self.store.rows('SELECT * FROM daily_cards')),1)
+
     def test_foreign_deleted_or_ambiguous_commands_are_ignored(self):
         cases=[dict(chat_id='oc_other'),dict(updated='true'),dict(updated=None),dict(deleted=True),dict(mentions=[]),
             dict(sender=dict(id='ou_other',id_type='open_id',sender_type='user')),
