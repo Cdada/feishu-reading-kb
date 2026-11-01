@@ -15,6 +15,7 @@ from .daily_store import Deferred
 from .f01 import PREFIX
 from .f05 import file_sha
 from .registry import encoded
+from .archive_handoff import ArchiveHandoff
 
 
 LABELS = {
@@ -39,12 +40,23 @@ LABELS = {
     'needs_upload':'需要补传完整原件，已有记录保留。',
 }
 TERMINAL = {'notified','rejected','duplicate','held','needs_upload'}
+READING_LABELS = {
+    'approved':'材料包已保存，正在准备知识整理。',
+    'organizing':'正在按知识库规范整理笔记、适用的知识卡片和主题入口。',
+    'reviewing':'正在进行独立复核；复核通过前不会发布整理成果。',
+    'ready':'独立复核及本机成果校验已通过，等待发布。',
+    'publishing':'正在发布知识整理成果。',
+    'completed':'知识整理成果已发布，正在核验完成状态。',
+    'needs_user_input':'材料包已保存，完整整理等待你补充来源信息。',
+    'failed':'独立复核未通过或整理暂停，尚未标记整理完成。',
+}
 
 
 class MainCards:
     def __init__(self, backend):
         self.b, self.store = backend, backend.store
         self.cards, self.delivery = backend.card_flow.cards, backend.card_flow.delivery
+        self.handoff=ArchiveHandoff(backend)
 
     def handles(self, mid):
         return self.store.document(mid)['data'].get('archive_main') is True
@@ -88,6 +100,19 @@ class MainCards:
         active=self.store.get('archive-main-active:'+mid)
         if active and active['phase']==phase:
             detail=active['label']
+        material_id=document['data'].get('reading_material_id')
+        if material_id:
+            rows=self.store.rows('SELECT state FROM reading_materials WHERE material_id=?',(material_id,))
+            if rows and phase in ('reading','reading_wait','held'):
+                detail=READING_LABELS[rows[0]['state']]
+                if active and active.get('reading_detail'):
+                    detail=active['label']
+        if phase in ('published','notified'):
+            if document['data'].get('reading_completed'):
+                detail='归档与知识整理已完成。原件、导读、笔记及适用的卡片和主题已保存。'
+            else:
+                detail='材料包已入库；本任务未启用完整知识整理。'
+            detail+='\n归档流程未核验问答索引；下次提问时按既有规则刷新。'
         snapshot = self.store.get('pdf-progress:'+mid)
         if phase=='original_saved' and snapshot:
             if snapshot['source_sha'] != document['source_sha']:
@@ -98,6 +123,9 @@ class MainCards:
             label = {'converting':'正在解析页面','retrying':'正在尝试既有 OCR 后备解析',
                      'merging':'正在校验和合并页面','converted':'页面已转换，正在整理结果'}[snapshot['stage']]
             detail = f'{label}：{done}/{total} 页成功。\n页面转换完成后，还需生成导读并由你确认入库。'
+        mineru=self.store.get('mineru_status')
+        if phase=='original_saved' and mineru and mineru['kind']=='starting':
+            detail='正在启动 MinerU；服务就绪后，首批页面仍可能需要加载模型。'
         deferred = self.store.get('defer:'+mid) or {}
         reason = deferred.get('reason', '')
         if phase not in TERMINAL and reason and (deferred.get('until') or 0)>self.store.now():
@@ -121,6 +149,13 @@ class MainCards:
                     detail += f"\n对应导读第 {binding['preview_version']} 版（聊天中的导读 PDF 文件）。"
             else:
                 detail = '已收到你的选择，正在核对并执行；无需再次点击。'
+        handoff=self.store.get('archive-handoff:'+mid)
+        if handoff and handoff['facts']['category'] in ('codex','user','resource'):
+            identity=handoff['facts']['id']
+            label={'codex':'需要 Codex 协助','user':'等待你补充信息','resource':'等待运行条件恢复'}[handoff['facts']['category']]
+            detail+=f'\n{label}。处理编号：{identity}\n本机《待处理材料与接续说明》→ {identity}'
+        if self.store.get('archive-handoff-error'):
+            detail+='\n本机接续说明更新失败，请由 Codex 先查看服务状态。'
         return dict(state['binding'], details=detail, decision=decision)
 
     def _write(self, mid, state):
@@ -151,7 +186,8 @@ class MainCards:
         if not card_matches(actual, render_card(desired)):
             raise MaterialProblem('主卡更新后的内容无法核对，资料处理记录保留。')
         state.update(binding=pending['binding'], sequence=pending['sequence'], last_at=self.store.now(),
-            display_key=pending.get('display_key'), receipt=dict(receipt, readback=checked, contract=contract))
+            display_key=pending.get('display_key'), observed=pending.get('observed'),
+            receipt=dict(receipt, readback=checked, contract=contract))
         state.pop('pending')
         self.store.put('archive-main:'+mid, state)
 
@@ -166,9 +202,13 @@ class MainCards:
         try:
             state = self.ensure(mid)
             document = self.store.document(mid)
+            observed=self.observation(document)
             if not state.get('pending'):
                 desired = self.desired(document, state)
                 if desired == state['binding']:
+                    if state.get('observed')!=observed:
+                        state['observed']=observed
+                        self.store.put('archive-main:'+mid,state)
                     return
                 snapshot=self.store.get('pdf-progress:'+mid)
                 display_key=desired
@@ -181,7 +221,7 @@ class MainCards:
                     return
                 if not force and document['phase'] not in TERMINAL|{'awaiting_confirmation','awaiting_images','confirmed'} and self.store.now()-state['last_at']<15:
                     return
-                state['pending'] = dict(binding=desired, sequence=state['sequence']+1,display_key=display_key)
+                state['pending'] = dict(binding=desired, sequence=state['sequence']+1,display_key=display_key,observed=observed)
                 if desired['decision']:
                     _, target = self.b.card_flow.material(document, desired['decision']['binding']['purpose'])
                     state['pending']['decision_target'] = target
@@ -200,21 +240,67 @@ class MainCards:
     def fallback(self, mid, state):
         if state.get('fallback'):
             return
-        proof = self.b.notice('archive-main-fallback:'+mid,
-            '这份资料的处理卡片暂时无法更新，已有决定和成果保留。请查看对应导读 PDF；仍可直接回复该 PDF 选择入库。',
-            confirmation=True)
+        self.record_handoffs()
+        saved=self.store.rows('SELECT payload FROM daily_operations WHERE op_key=?',('notice:archive-main-fallback:'+mid,))
+        handoff=self.store.get('archive-handoff:'+mid)
+        identity=handoff['facts']['id'] if handoff else '待生成'
+        text=f'这份资料的主卡暂时无法更新，已有决定与成果保留。处理编号：{identity}；请由 Codex 查看本机《待处理材料与接续说明》。'
+        if self.store.get('archive-handoff-error'):
+            text=f'这份资料的主卡暂时无法更新，已有决定与成果保留。处理编号：{identity}；接续说明写入失败，请由 Codex 先查看本机服务状态。'
+        if saved:text=json.loads(saved[0]['payload'])['notice_plan']['payload']
+        proof = self.b.notice('archive-main-fallback:'+mid,text,confirmation=True)
         state['fallback'] = proof
         self.store.put('archive-main:'+mid, state)
 
     def report(self):
         # Round robin bounds display work; no new scheduler/thread or polling.
         rows = self.store.rows('SELECT message_id FROM daily_documents ORDER BY created,message_id')
-        mids = [r['message_id'] for r in rows if self.handles(r['message_id'])]
+        mids=[]
+        for row in rows:
+            mid=row['message_id']
+            if not self.handles(mid):continue
+            document=self.store.document(mid);state=self.state(mid) or {}
+            if state.get('disabled') and state.get('fallback'):continue
+            if document['phase'] in TERMINAL and not state.get('pending') and state.get('observed')==self.observation(document):
+                continue
+            mids.append(mid)
         if not mids:
             return
         offset = self.store.get('archive-main-round-robin') or 0
         self.store.put('archive-main-round-robin', offset+1)
         self.report_one(mids[offset % len(mids)])
+
+    def observation(self, document):
+        handoff=self.store.get('archive-handoff:'+document['message_id']) or {}
+        return dict(phase=document['phase'],updated=document['updated'],handoff_at=handoff.get('updated'),
+                    handoff_error=self.store.get('archive-handoff-error'))
+
+    def record_handoffs(self):
+        try:
+            for row in self.store.rows('SELECT message_id FROM daily_documents ORDER BY created,message_id'):
+                if self.handles(row['message_id']):
+                    self.handoff.observe(self.store.document(row['message_id']),flush=False)
+            self.handoff.render()
+            self.store.put('archive-handoff-error',None)
+        except (OSError,ContractError) as error:
+            # Display-document failure must be visible, without altering the
+            # archive state, retrying a model, or overwriting human notes.
+            self.store.put('archive-handoff-error',dict(kind=type(error).__name__,
+                reason='接续说明无法更新，请检查文件可写性、机器状态标记和现有临时文件。'))
+
+    def completion(self, document):
+        self.record_handoffs()
+        self.report_one(document['message_id'],force=True)
+        state=self.state(document['message_id'])
+        if state and state.get('disabled'):
+            self.record_handoffs()
+            self.fallback(document['message_id'],state)
+            return dict(kind='main_card_unavailable',handoff=self.handoff.path.name,
+                        notice=self.state(document['message_id']).get('fallback'))
+        if not state or state.get('pending') or state.get('binding')!=self.desired(document,state):
+            raise Deferred('archive_main_completion_pending')
+        return dict(kind='main_card',message_id=self.cards.get(state['card_id'])['message_id'],
+                    receipt=state['receipt']['readback'])
 
     def action_state(self, card):
         mid = self.store.get('archive-main-action:'+card['card_id'])

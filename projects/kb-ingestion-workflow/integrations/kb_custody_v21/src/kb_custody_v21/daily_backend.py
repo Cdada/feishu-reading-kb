@@ -118,6 +118,9 @@ class DailyBackend:
         self.stop.set()
 
     def _mineru_event(self, event):
+        owner=self.store.get('mineru-task-message')
+        if owner:
+            event=dict(event,document_id=owner)
         self.store.put('mineru-notice:'+event['id'], event)
         self.store.put('mineru_status', event)
 
@@ -135,6 +138,9 @@ class DailyBackend:
         for row in rows:
             event = json.loads(row['value'])
             if event is not None:
+                if self.main_cards is not None and event.get('document_id') and self.main_cards.handles(event['document_id']):
+                    self.store.put(row['key'],None)
+                    continue
                 self.notice(row['key'], event['text'], purpose='service', confirmation=True)
                 self.store.put(row['key'], None)
 
@@ -169,6 +175,8 @@ class DailyBackend:
 
 
     def report_status(self):
+        if self.main_cards is not None:
+            self.main_cards.record_handoffs()
         try:
             self._storage_ready()
         except Deferred as error:
@@ -212,6 +220,8 @@ class DailyBackend:
             self.store.put('recovery_report_pending',None)
             return
         for row in self.store.rows("SELECT * FROM daily_documents WHERE phase IN ('held','published') ORDER BY updated"):
+            if self.main_cards is not None and self.main_cards.handles(row['message_id']):
+                continue
             deferred=self.store.get('defer:'+row['message_id']) or {}
             reason=row['reason'] or deferred.get('reason')
             if not reason:
@@ -401,13 +411,16 @@ class DailyBackend:
         canonical=self.store.bind_source(mid,row['sha256'])
         if canonical:
             self.store.advance(mid,'original_saved','duplicate',data=dict(existing_message_id=canonical))
-            self.notice('duplicate:'+mid,'“'+name+'”与已登记原件相同，沿用已有处理记录。')
+            if self.main_cards is None or not self.main_cards.handles(mid):
+                self.notice('duplicate:'+mid,'“'+name+'”与已登记原件相同，沿用已有处理记录。')
             return
         if self.main_cards is None or not self.main_cards.handles(mid):
             self.notice('custody:'+mid,'“'+name+'”的原件已完整保存，将按队列制作导读。',purpose='custody')
 
     @timed('conversion')
     def _convert(self, document):
+        if Path(document['filename']).suffix.lower()=='.pdf':
+            self.store.put('mineru-task-message',document['message_id'])
         if self.main_cards is not None:
             self.main_cards.activity(document,'正在解析文档，并检查转换结果。')
         mid=document['message_id']
@@ -427,7 +440,8 @@ class DailyBackend:
             complete=[r for r in previous if r['state']=='published']
             if not complete:
                 raise MaterialProblem('同一原件已有处理记录，请由 Codex 接续原记录，避免重复生成。')
-            self.notice('duplicate:'+mid,'“'+document['filename']+'”的同一原件已经入库，沿用已有成果。')
+            if self.main_cards is None or not self.main_cards.handles(mid):
+                self.notice('duplicate:'+mid,'“'+document['filename']+'”的同一原件已经入库，沿用已有成果。')
             self.store.advance(mid,'original_saved','duplicate',data=dict(existing_publication=complete[-1]['publication_id']))
             return
         profile=json.loads(Path(self.authority.config['guide_plan']).read_bytes())
@@ -756,8 +770,11 @@ class DailyBackend:
             if document['data'].get('reading_material_id') and not document['data'].get('reading_completed'):
                 raise ContractError('reading completion must precede the completion notice')
             outcome='已完成独立测试库的完整整理。' if document['data'].get('reading_completed') else '已确认入库。'
-            receipt=self.notice('published:'+row['publication_id'],'“'+document['filename']+'”'+outcome,
-                                purpose='publication',confirmation=True)
+            if self.main_cards is not None and self.main_cards.handles(document['message_id']):
+                receipt=self.main_cards.completion(document)
+            else:
+                receipt=self.notice('published:'+row['publication_id'],'“'+document['filename']+'”'+outcome,
+                                    purpose='publication',confirmation=True)
             if self.relations is not None and document['data'].get('reading_completed'):
                 self.relations.start(document)
             self.store.advance(document['message_id'],'published','notified',data=dict(completion_notice=receipt))

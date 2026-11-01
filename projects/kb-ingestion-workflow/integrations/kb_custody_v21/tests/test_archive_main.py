@@ -125,7 +125,7 @@ class MainCardIOTests(unittest.TestCase):
         f.card=f.cards.prepare(dict(purpose='archive_main',document_id='om_pdf',target_message_id='om_pdf',
             source_sha256='a'*64,details='正在排队',decision=None),'合成资料')
         f.delivery=CardDelivery(f.f.transport,f.cards)
-        main=MainCards(SimpleNamespace(store=f.f.store,transport=f.f.transport,
+        main=MainCards(SimpleNamespace(store=f.f.store,transport=f.f.transport,authority=f.f.a,
             card_flow=SimpleNamespace(cards=f.cards,delivery=f.delivery)))
         return f,main
 

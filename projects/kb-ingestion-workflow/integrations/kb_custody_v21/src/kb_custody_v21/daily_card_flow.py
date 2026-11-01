@@ -176,6 +176,9 @@ class CardFlow:
                 self.cards.finish(row['card_id'], result, checked_access=self.backend.check_authorization)
                 choice = self.cards.choice(row['card_id'])
                 card = self.cards.get(row['card_id'])
+            main=getattr(self.backend,'main_cards',None)
+            if main is not None and main.handles(document['message_id']):
+                continue
             key = 'card-display:'+row['card_id']
             display = self.store.get(key) or {}
             if display.get('status') in ('verified', 'fallback_verified') or not card['receipt']:
