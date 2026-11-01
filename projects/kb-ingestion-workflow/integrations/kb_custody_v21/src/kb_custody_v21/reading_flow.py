@@ -185,6 +185,9 @@ class ReadingFlow:
             if review['status']=='reject':
                 self.store.advance(material['material_id'],'reviewing','failed',detail=dict(failure=review['findings']),checked_access=self.check)
                 raise MaterialProblem('整理复核未通过，结果已保留，请由 Codex 核查；尚未标记整理完成。')
+            main=getattr(self.backend,'main_cards',None)
+            if main is not None and main.handles(document['message_id']):
+                self.backend.store.put('archive-main-active:'+document['message_id'],dict(phase='reading',reading_detail=True,label='独立复核已通过，正在本机核对笔记、卡片、主题和发布清单。'))
             files,_=self.assets(document)
             existing={p:b'' for p in saved['available_paths']}
             existing.update({p:t.encode() for p,t in saved['existing_files'].items()})
@@ -251,6 +254,9 @@ class ReadingFlow:
         rows=self.backend.store.rows("SELECT message_id FROM daily_documents WHERE phase IN ('reading','reading_wait') ORDER BY created")
         for row in rows:
             document=self.backend.store.document(row['message_id'])
+            main=getattr(self.backend,'main_cards',None)
+            if main is not None and main.handles(row['message_id']):
+                continue
             material=self.store.get(document['data']['reading_material_id'])
             deferred=self.backend.store.get('defer:'+row['message_id']) or {}
             reason=deferred.get('reason','')

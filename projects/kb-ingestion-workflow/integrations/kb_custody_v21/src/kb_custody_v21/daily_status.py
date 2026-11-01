@@ -39,7 +39,9 @@ def local_status(root):
                 blocked=[dict(document_id=v['document_id'],reason=v.get('error')) for v in tasks if v['state']=='blocked'],
                 write_pending=bool(meta.get('relation-write-pending')),
                 wait=meta.get('relation-wait'))
-        return dict(result,summary=summary,heartbeat=meta.get('heartbeat'),network_pause=meta.get('network_pause'),
+        handoff_path=no_symlinks(root/'待处理材料与接续说明.local.md')
+        handoff=dict(path=str(handoff_path) if handoff_path.exists() else None,error=meta.get('archive-handoff-error'))
+        return dict(result,summary=summary,archive_handoff=handoff,heartbeat=meta.get('heartbeat'),network_pause=meta.get('network_pause'),
             collection_wait=meta.get('collection_wait'),storage_wait=meta.get('storage_wait'),policy=meta.get('policy'))
     finally:
         db.close()
@@ -59,6 +61,8 @@ def user_summary(value, *, max_items=None):
         lines.append('上次运行已暂停，需要核查：'+str(heartbeat.get('detail','未知原因')))
     if value.get('storage_wait'):
         lines.append('资料存储已暂停：'+str(value['storage_wait'].get('message','请连接原资料盘并检查空间。')))
+    if value.get('archive_handoff',{}).get('error'):
+        lines.append('本机接续说明更新失败，请由 Codex 检查；归档记录保留。')
     summary=value.get('summary',{})
     if summary.get('last_published'):
         lines.append('最近入库：'+title(summary['last_published']))
