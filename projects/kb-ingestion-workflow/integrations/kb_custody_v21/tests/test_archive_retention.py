@@ -72,3 +72,15 @@ class PreviewTests(unittest.TestCase):
         missing=self.root.parent/'another/conversion-work/daily-service'
         with self.assertRaises(ContractError):preview(missing)
         self.assertFalse(missing.exists())
+
+    def test_large_receipt_tree_is_bounded_after_material_evidence(self):
+        grants=self.root/'model-grants';grants.mkdir();(grants/'synthetic').write_text('retained')
+        requests=self.root/'requests';requests.mkdir()
+        for n in range(110):(requests/str(n)).write_text('synthetic')
+        limited=preview(self.root,max_entries=100)
+        self.assertFalse(limited['complete'])
+        self.assertEqual(limited['rows'][0]['area'],'model-grants')
+        self.assertTrue(limited['rows'][0]['complete'])
+        self.assertTrue(preview(self.root,max_entries=200)['complete'])
+        for limit in (False,99,500001):
+            with self.assertRaises(ContractError):preview(self.root,max_entries=limit)
