@@ -316,7 +316,15 @@ class MainCards:
             return 'stale'
         receipt = state['receipt']
         evidence = dict(receipt['sent']['evidence'], **receipt['target']['evidence'], **receipt['readback']['evidence'])
-        actual, checked = read_card(self.b.transport, 'main-event-read:'+stable_key(event['event_id']),
+        binding, target = self.b.card_flow.material(self.store.document(card['document_id']), card['purpose'])
+        if binding != action['binding']:
+            return 'stale'
+        # Each guarded HTTP child needs the decision's PDF/image receipt as
+        # well as the original attachment and main-card receipts. A previous
+        # PATCH having checked that evidence does not grant a later GET access.
+        self.b.transport._checked_result(target)
+        evidence.update(target['evidence'])
+        actual, checked = read_card(self.b.transport, 'main-event-read:'+stable_key(event['event_id'], target['receipt']),
                                    receipt['contract'], evidence)
         desired = dict(self.cards.get(state['card_id']), binding=state['binding'])
         if not card_matches(actual, render_card(desired)):
