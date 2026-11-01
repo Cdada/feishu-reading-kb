@@ -14,6 +14,7 @@ from .daily_transport import durable_file
 from .f05 import file_sha
 from .pilot_decision import observed_reply
 from .reading_bundle import build_bundle, READING, CARDS, TOPICS
+from .reading_input_storage import save as save_input, unpack as unpack_input
 from .reading_contract import require, sha, validate_input, MAX_INPUT_BYTES
 from .reading_model import ReadingModel
 from .reading_publish import prepare_plan, publish_plan, read_at, snapshot_library, MAX_LIBRARY_BYTES
@@ -153,7 +154,7 @@ class ReadingFlow:
         input_path=root/f'input-{revision}.local.json'
         saved=dict(source=source,existing_files={p:raw.decode() for p,raw in snapshot['existing_files'].items()},
             available_paths=snapshot['available_paths'],date=datetime.fromtimestamp(material['created'],timezone.utc).astimezone().date().isoformat())
-        durable_file(input_path,saved)
+        save_input(input_path,saved)
         return input_path,file_sha(input_path)
 
     def step(self,document):
@@ -169,7 +170,7 @@ class ReadingFlow:
         if state in ('organizing','reviewing'):
             input_path=no_symlinks(Path(detail['input_path']))
             require(input_path.parent==root and file_sha(input_path)==detail['input_file_sha256'],'saved reading input changed')
-            saved=json.loads(input_path.read_bytes());source=saved['source']
+            saved=unpack_input(json.loads(input_path.read_bytes()));source=saved['source']
             self.checked_source(source)
             if state=='organizing':
                 draft=self.model.run('organize',source)
