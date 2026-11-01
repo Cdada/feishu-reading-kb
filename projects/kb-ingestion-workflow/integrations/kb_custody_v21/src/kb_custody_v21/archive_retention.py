@@ -51,7 +51,9 @@ def usage(path, budget):
     return dict(logical_bytes=total,file_count=files,latest_modified=latest,
                 complete=not issues,issues=sorted(set(issues)))
 
-def preview(daily_root, *, now=None):
+def preview(daily_root, *, now=None, max_entries=MAX_ENTRIES):
+    if type(max_entries) is not int or not 100<=max_entries<=500000:
+        raise ContractError("inventory limit must be between 100 and 500000")
     root=no_symlinks(Path(daily_root).absolute())
     if root.name!='daily-service' or root.parent.name!='conversion-work':
         raise ContractError('explicit existing project daily-service directory required')
@@ -69,9 +71,9 @@ def preview(daily_root, *, now=None):
     for d in docs:
         if d['source_sha']:by_sha.setdefault(d['source_sha'],[]).append(d)
     state=DailyLauncher(root).status()
-    budget=[MAX_ENTRIES];rows=[]
-    areas=[(name,root/name) for name in ('requests','model-grants','reading-jobs')]
-    areas.append(('pdf-chunks',root.parent/'pdf-chunks'))
+    budget=[max_entries];rows=[]
+    areas=[(name,root/name) for name in ('model-grants','reading-jobs')]
+    areas.extend([('pdf-chunks',root.parent/'pdf-chunks'),('requests',root/'requests')])
     for name,path in areas:
         no_symlinks(path)
         if not path.exists():continue
@@ -109,7 +111,7 @@ def preview(daily_root, *, now=None):
             **measured))
     return dict(reference='archive-retention-preview/v1',read_only=True,deleted_files=0,
         grace_days_suggestion=7,grace_policy_approved=False,service_running=state['running'],
-        complete=all(r['complete'] for r in rows),rows=rows,
+        complete=all(r['complete'] for r in rows),entry_limit=max_entries,rows=rows,
         candidates=sum(r['eligible_for_review'] for r in rows),
         measurement='logical_bytes_not_reclaimable_disk_space',
         excluded=['originals','published_library','shared_caches','models','historical_development_artifacts','unrecognized_files'],
@@ -118,7 +120,8 @@ def preview(daily_root, *, now=None):
 def main():
     parser=argparse.ArgumentParser(description='只读过程文件保留与清理候选清单')
     parser.add_argument('--daily-root',required=True)
+    parser.add_argument('--max-entries',type=int,default=MAX_ENTRIES)
     args=parser.parse_args()
-    print(json.dumps(preview(args.daily_root),ensure_ascii=False,indent=2))
+    print(json.dumps(preview(args.daily_root,max_entries=args.max_entries),ensure_ascii=False,indent=2))
 
 if __name__=='__main__':main()
