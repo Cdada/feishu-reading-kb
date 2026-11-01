@@ -65,6 +65,22 @@ class MainCardTests(unittest.TestCase):
         self.assertFalse(any(op.startswith(('notice:custody:','notice:registered:')) for op,_ in f.transport.calls))
         self.assertTrue(any(op.endswith(':send') and op.startswith('preview:') for op,_ in f.transport.calls))
 
+    def test_callback_read_keeps_decision_receipt_in_each_guarded_request(self):
+        f=self.case();action=self.action(f)
+        request=f.transport.request
+        reads=[]
+        def checked(operation,kind,path,**kwargs):
+            card=kwargs.get('card') or {}
+            if operation.startswith('main-event-read:'):
+                target=card['decision_receipt']
+                self.assertIn(target,kwargs['evidence'])
+                self.assertEqual(kwargs['evidence'][target],file_sha(target))
+                reads.append(target)
+            return request(operation,kind,path,**kwargs)
+        f.transport.request=checked
+        self.assertEqual(self.click(f,action),'accepted')
+        self.assertEqual(len(reads),1)
+
     def test_restart_preserves_binding_and_disables_buttons_after_choice(self):
         f=self.case();action=self.action(f)
         original=f.backend.main_cards.state(f.mid)['card_id']
