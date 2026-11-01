@@ -87,6 +87,7 @@ class DailyStore:
         self.path = no_symlinks(Path(path).absolute())
         self.policy, self.clock = policy, clock
         self.timing = None
+        self.archive_cards_enabled = False
         if (not self.path.exists() or self.path.stat().st_size==0) and any(
                 (self.path.parent/name).exists() for name in ('requests','model-grants')):
             raise ContractError('daily ledger is missing beside retained requests; refuse to reset usage')
@@ -281,7 +282,7 @@ class DailyStore:
             raise Deferred('queue_full')
         db.execute('''INSERT INTO daily_documents(message_id,filename,phase,created,updated,data)
                       VALUES (?,?,'registered',?,?,?)''',
-                   (mid, filename, self.now(), self.now(), encoded(dict(resource=resource))))
+                   (mid, filename, self.now(), self.now(), encoded(dict(resource=resource, **({'archive_main': True} if self.archive_cards_enabled else {})))))
         if self.timing is not None:
             self.timing.register(db,mid,item,filename)
 
@@ -358,7 +359,8 @@ class DailyStore:
             if payload.get('mode')=='card_update':
                 target = payload['card']['message_id']
                 used = db.execute("SELECT coalesce(sum(attempts),0) FROM daily_operations WHERE json_extract(payload,'$.mode')='card_update' AND json_extract(payload,'$.card.message_id')=?", (target,)).fetchone()[0]
-                if used >= 20:
+                ceiling = 64 if payload['card'].get('binding',{}).get('purpose')=='archive_main' else 20
+                if used >= ceiling:
                     raise Deferred('card_update_limit')
             if payload.get('mode')=='update':
                 target = payload['progress']['message_id']

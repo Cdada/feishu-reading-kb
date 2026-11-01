@@ -120,6 +120,10 @@ class DailyTransport:
         request = dict(kind=kind, path=path, mode=mode, body=body, evidence=evidence,
                        download=download, preview=preview, notice_plan=notice_plan)
         if card is not None:
+            if card.get('binding',{}).get('purpose')=='archive_main':
+                from .archive_main_contract import PROFILE
+                if self.authority.config.get('archive_cards')!=PROFILE:
+                    raise ContractError('explicit archive main profile required')
             if (self.authority.config.get('cards') != dict(reference='P40-cards-v1',enabled=True)
                     or progress is not None or preview is not None or notice_plan is not None or download is not None
                     or mode not in ('send','card_update','read')):

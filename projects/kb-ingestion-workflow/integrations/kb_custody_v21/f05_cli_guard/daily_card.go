@@ -10,15 +10,17 @@ import (
 )
 
 type dailyCard struct {
-	ID        string         `json:"card_id"`
-	Binding   map[string]any `json:"binding"`
-	Title     string         `json:"title"`
-	Content   string         `json:"content"`
-	Result    string         `json:"result"`
-	MessageID string         `json:"message_id"`
-	Origin    string         `json:"origin_receipt"`
-	Target    string         `json:"target_receipt"`
-	Previous  string         `json:"previous_content"`
+	PreviousBinding map[string]any `json:"previous_binding,omitempty"`
+	Decision        string         `json:"decision_receipt,omitempty"`
+	ID              string         `json:"card_id"`
+	Binding         map[string]any `json:"binding"`
+	Title           string         `json:"title"`
+	Content         string         `json:"content"`
+	Result          string         `json:"result"`
+	MessageID       string         `json:"message_id"`
+	Origin          string         `json:"origin_receipt"`
+	Target          string         `json:"target_receipt"`
+	Previous        string         `json:"previous_content"`
 }
 
 var cardSHA = regexp.MustCompile(`^[a-f0-9]{64}$`)
@@ -43,6 +45,9 @@ func cardBinding(v *dailyCard) bool {
 	if !cardSHA.MatchString(v.ID) || !cardID.MatchString(parent) || !cardID.MatchString(doc) || !cardSHA.MatchString(source) ||
 		strings.TrimSpace(v.Title) == "" || len(v.Title) > 1024 {
 		return false
+	}
+	if purpose == "archive_main" {
+		return mainCardBinding(v)
 	}
 	if relationPurpose(purpose) {
 		return relationBinding(b)
@@ -99,6 +104,20 @@ func cardJSON(v *dailyCard) map[string]any {
 	if b["purpose"] == "archive_status" {
 		title, detail, commands = "归档收件状态", b["details"].(string), nil
 	}
+	actionID := v.ID
+	if b["purpose"] == "archive_main" {
+		title, detail, commands = "资料归档", b["details"].(string), nil
+		if b["decision"] != nil {
+			a := b["decision"].(map[string]any)
+			child := a["binding"].(map[string]any)
+			actionID = a["card_id"].(string)
+			if child["purpose"] == "preview" {
+				commands = []string{"确认入库", "补充材料后再入库", "暂不入库"}
+			} else {
+				commands = []string{"按缺图版本继续", "重新发文件"}
+			}
+		}
+	}
 	t := plainCardText(v.Title)
 	t["text_size"] = "heading-3"
 	elems := []any{map[string]any{"tag": "div", "text": t}, map[string]any{"tag": "div", "text": plainCardText(detail)}}
@@ -111,7 +130,7 @@ func cardJSON(v *dailyCard) map[string]any {
 				kind = "primary_filled"
 			}
 			elems = append(elems, map[string]any{"tag": "button", "text": plainCardText(command), "type": kind, "width": "fill",
-				"behaviors": []any{map[string]any{"type": "callback", "value": map[string]any{"reference": "P40-card-v1", "card_id": v.ID, "command": command}}}})
+				"behaviors": []any{map[string]any{"type": "callback", "value": map[string]any{"reference": "P40-card-v1", "card_id": actionID, "command": command}}}})
 		}
 	}
 	return map[string]any{"schema": "2.0", "config": map[string]any{"width_mode": "default", "update_multi": true, "enable_forward": false},
@@ -123,6 +142,9 @@ func dailyCardPath(c Control, p pilotSession) bool {
 	v := c.Card
 	if v == nil || p.Daily == nil || c.Reference != "P11" || c.Progress != nil || c.Notice != nil || c.Preview != nil || c.Download != nil ||
 		!cardEnabled(c, p.Daily.Rules) || !cardBinding(v) || len(v.Content) > 32768 || len(v.Result) > 2048 {
+		return false
+	}
+	if v.Binding["purpose"] == "archive_main" && (!mainCardEnabled(c, p.Daily.Rules) || v.Result != "" || !mainCardDecisionReceipt(c, p, v)) {
 		return false
 	}
 	if v.Binding["purpose"] == "archive_status" && !archiveMentionEnabled(c, p.Daily.Rules) {
@@ -152,6 +174,12 @@ func dailyCardPath(c Control, p pilotSession) bool {
 	parent := v.Binding["target_message_id"].(string)
 	targetOK := false
 	for _, m := range dailyReceiptMessages(c, p, v.Target) {
+		if v.Binding["purpose"] == "archive_main" && m["message_id"] == parent && m["chat_id"] == p.ChatID && m["msg_type"] == "file" && m["deleted"] == false && m["updated"] == false {
+			sender, _ := m["sender"].(map[string]any)
+			if sender["id"] == p.AccountID && sender["id_type"] == "open_id" && sender["sender_type"] == "user" {
+				targetOK = true
+			}
+		}
 		if v.Binding["purpose"] == "archive_status" && m["message_id"] == parent && archiveNativeCommand(m, p) {
 			targetOK = true
 		}
@@ -165,7 +193,7 @@ func dailyCardPath(c Control, p pilotSession) bool {
 	}
 	if c.Mode == "send" {
 		var body map[string]string
-		return c.Kind == "send" && v.MessageID == "" && v.Origin == "" && v.Result == "" && v.Previous == "" &&
+		return c.Kind == "send" && v.MessageID == "" && v.Origin == "" && v.Result == "" && v.Previous == "" && v.PreviousBinding == nil && v.Decision == "" &&
 			c.Path == "/open-apis/im/v1/messages/"+parent+"/reply" && json.Unmarshal([]byte(c.Body), &body) == nil && len(body) == 3 &&
 			body["msg_type"] == "interactive" && body["content"] == v.Content && body["uuid"] == "card-"+v.ID[:40]
 	}
@@ -183,6 +211,10 @@ func dailyCardPath(c Control, p pilotSession) bool {
 	}
 	if c.Mode == "read" {
 		return c.Kind == "message" && c.Body == "" && c.Path == "/open-apis/im/v1/messages/"+v.MessageID+"?card_msg_content_type=user_card_content"
+	}
+	if v.Binding["purpose"] == "archive_main" {
+		var body map[string]string
+		return c.Mode == "card_update" && c.Kind == "send" && c.Path == "/open-apis/im/v1/messages/"+v.MessageID && json.Unmarshal([]byte(c.Body), &body) == nil && len(body) == 1 && body["content"] == v.Content && mainCardPrevious(v)
 	}
 	var body map[string]string
 	initial := *v

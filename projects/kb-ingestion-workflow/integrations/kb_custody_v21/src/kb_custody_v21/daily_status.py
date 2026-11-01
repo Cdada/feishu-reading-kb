@@ -28,7 +28,7 @@ def local_status(root):
             history_gaps=[dict(r) for r in db.execute('SELECT channel,gap_start,gap_end FROM daily_scans WHERE gap_start IS NOT NULL')])
         if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='daily_archive_inbox'").fetchone():
             counts={r['state']:r['n'] for r in db.execute('SELECT state,count(*) AS n FROM daily_archive_inbox GROUP BY state')}
-            summary['archive_mentions']=dict(pending=counts.get('pending',0)+counts.get('responding',0),
+            summary['archive_mentions']=dict(pending=counts.get('pending',0)+counts.get('responding',0)+counts.get('main_responding',0),
                 held=counts.get('held',0), listener=meta.get('card_listener_status'),
                 last_problem=meta.get('archive-mention-problem'))
         tasks=[v for k,v in meta.items() if k.startswith('relation-task:') and isinstance(v,dict)]

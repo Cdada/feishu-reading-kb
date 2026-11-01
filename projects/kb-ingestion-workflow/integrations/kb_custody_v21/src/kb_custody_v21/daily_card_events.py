@@ -76,7 +76,12 @@ class EventIngress:
                 raise ContractError('saved callback evidence changed')
             value = bounded_json(event['action_value'],4096)
             card = b.card_flow.cards.get(value['card_id'])
-            if card['purpose']=='qa' and getattr(b,'qa',None) is None:
+            main=getattr(b,'main_cards',None)
+            if main is not None and main.action_state(card) is not None:
+                outcome=main.read_event(card,event,proof)
+                if outcome is None:
+                    continue
+            elif card['purpose']=='qa' and getattr(b,'qa',None) is None:
                 outcome = 'disabled'
             elif card['purpose'].startswith('relation_') and getattr(b,'relations',None) is None:
                 outcome = 'disabled'

@@ -126,6 +126,9 @@ class PdfProgress:
             if Path(row['filename']).suffix.lower()!='.pdf':
                 continue
             mid=row['message_id']
+            main=getattr(self.backend,'main_cards',None)
+            if main is not None and main.handles(mid):
+                continue
             display=self.store.get('pdf-display:'+mid)
             if display is None and row['phase'] in FINAL:
                 continue
