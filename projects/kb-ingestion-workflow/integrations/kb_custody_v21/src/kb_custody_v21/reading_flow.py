@@ -18,6 +18,7 @@ from .reading_contract import require, sha, validate_input, MAX_INPUT_BYTES
 from .reading_model import ReadingModel
 from .reading_publish import prepare_plan, publish_plan, read_at, snapshot_library, MAX_LIBRARY_BYTES
 from .reading_store import ReadingStore
+from .archive_timing import stage, timed
 from .layout_evidence import evidence_policy, checked_policy
 from .registry import encoded
 from .runtime import no_symlinks
@@ -86,6 +87,7 @@ class ReadingFlow:
         evidence[str(original)]=entry['sha256']
         return files,evidence
 
+    @timed('reading_source', 'check')
     def checked_source(self,source):
         document=self.backend.store.document(source['binding']['document_id'])
         require(self.binding(document)==source['binding'],'source, preview or decision no longer matches reading input')
@@ -156,6 +158,7 @@ class ReadingFlow:
         material=self.store.get(document['data']['reading_material_id'])
         require(material['binding']==self.binding(document),'reading binding changed')
         state=material['state'];detail=material['detail'];root=self._job(material)
+        stage('reading:'+state)
         if state=='approved':
             path,digest=self._prepare_input(document,material)
             self.store.advance(material['material_id'],'approved','organizing',detail=dict(input_path=str(path),input_file_sha256=digest),checked_access=self.check)

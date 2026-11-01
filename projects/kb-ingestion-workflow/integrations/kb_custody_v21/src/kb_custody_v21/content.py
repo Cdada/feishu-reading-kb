@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 from .contracts import ContractError, new_id
+from .archive_timing import timed
 from .conversion import sha
 from .registry import now
 from .layout_evidence import evidence_policy, require_citable
@@ -238,6 +239,7 @@ class ReadingGuideAdapter:
             request['evidence_policy'] = layout
         return request
 
+    @timed('guide_output_and_coverage', 'check')
     def validate_response(self, record, content, mapping, consent, request, response):
         text = content.decode('utf-8')
         authorized = consent['ranges']

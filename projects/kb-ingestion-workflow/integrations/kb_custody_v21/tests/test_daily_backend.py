@@ -111,6 +111,35 @@ class DailyBackendTests(unittest.TestCase):
         self.assertTrue(content['file_name'].endswith('_第1版.pdf'))
         self.assertNotIn('publication_',content['file_name'])
 
+    def test_timing_observes_full_archive_without_more_model_or_transport_calls(self):
+        from kb_custody_v21.archive_timing import PROFILE,report
+        self.authority.config['archive_timing']=dict(PROFILE)
+        self.authority.config['source_manifest_sha256']='c'*64
+        self.authority.source_commit='a'*40
+        self.authority.frozen={'':'b'*64}
+        self.authority.reading=None
+        self.store=DailyStore(self.root/'timed.sqlite3',self.policy)
+        self.backend=DailyBackend(self.authority,self.store,registry=self.registry,transport=self.transport,
+            resources=ready(self.registry),wire=self.g.wire)
+        self.backend.collector.verify_isolation=lambda:None
+        scan=self.store.scan('chat',initial_start=self.store.now()-60)
+        self.store.save_page(scan,[self.g.f.message],has_more=False)
+        self.store.advance(self.mid,'registered','original_saved',entry_id=self.entry)
+        self.store.bind_source(self.mid,self.registry.entry(self.entry)['sha256'])
+        document=self.preview()
+        self.assertEqual(len(self.transport.calls),4)
+        self.owner_reply(document)
+        self.backend.advance_light(document)
+        value=report(self.store.path)['samples'][0]
+        self.assertEqual(value['phase'],'notified')
+        self.assertTrue(value['completed'])
+        self.assertEqual(self.g.wire.calls,1)
+        self.assertEqual(self.store.summary()['model_turns'],1)
+        metrics=value['check_and_step_totals']
+        self.assertEqual(metrics['model:guide']['count'],1)
+        self.assertGreater(metrics['check:resources']['count'],0)
+        self.assertGreater(metrics['check:guide_output_and_coverage']['count'],0)
+
     def test_interrupted_legacy_preview_keeps_original_filename(self):
         actual=self.transport.request
         def interrupt(operation,kind,path,**kwargs):

@@ -16,6 +16,7 @@ from pypdf import PdfWriter
 from pypdf.errors import PdfReadError
 
 from .contracts import ContractError
+from .archive_timing import measure, observed, timed
 from .daily_launcher import write_state
 from .daily_store import Deferred
 from .runtime import no_symlinks
@@ -144,6 +145,7 @@ class TableHTML(HTMLParser):
         self.parts.append(escape(data))
 
 
+@timed('pdf_chunk_normalization', 'check')
 def render_chunk(output, destination, *, first_page, page_count, stem, version):
     """Normalize only the installed content_list schema; never guess page IDs."""
     lists = sorted(output.rglob('*_content_list.json'))
@@ -369,6 +371,9 @@ class PdfChunks:
                     raise ContractError('completed PDF chunk path changed')
                 checked_snapshot(root / saved, chunk['completed']['files'])
         def report(stage, chunk=None):
+            observed('pdf',dict(stage=stage,total_pages=count,
+                completed_pages=sum(c['page_count'] for c in chunks if c['completed']),
+                first_page=chunk['first_page'] if chunk else None))
             progress(dict(source_sha=source_sha, total_pages=count,
                 completed_pages=sum(c['page_count'] for c in chunks if c['completed']), stage=stage,
                 compatibility=compatibility['reference'] if compatibility else None,
@@ -423,7 +428,8 @@ class PdfChunks:
                 try:
                     output = directory / 'raw'
                     report('retrying' if row['mode']=='ocr' else 'converting', chunk)
-                    self.converter.convert(pdf, output, mode=row['mode'])
+                    with measure('mineru_'+row['mode'], 'parser'):
+                        self.converter.convert(pdf, output, mode=row['mode'])
                     self.check()
                     render_chunk(output, directory / 'normalized', first_page=chunk['first_page'],
                                  page_count=chunk['page_count'], stem=chunk['stem'], version=self.options.version)

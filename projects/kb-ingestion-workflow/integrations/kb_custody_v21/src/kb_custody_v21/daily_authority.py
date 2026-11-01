@@ -13,6 +13,7 @@ from .f05 import file_sha
 from .pilot_feishu import read_json
 from .runtime import Runtime, no_symlinks
 from .pilot_publication_inputs import reject_moving_inputs
+from .archive_timing import PROFILE as TIMING_PROFILE, timed
 
 
 class DailyAuthority:
@@ -32,6 +33,10 @@ class DailyAuthority:
                     'text_node', 'text_script', 'codex_binary', 'initial_history_start'}
         if 'reading' in c:
             required.add('reading')
+        if 'archive_timing' in c:
+            required.add('archive_timing')
+            if c['archive_timing'] != TIMING_PROFILE or type(c['archive_timing'].get('sample_limit')) is not int:
+                raise ContractError('explicit bounded archive timing profile required')
         if 'relations' in c:
             required.add('relations')
             if c['relations'] != dict(reference='P42-relations-v1', enabled=True) or not {'reading','cards'} <= set(c):
@@ -92,6 +97,7 @@ class DailyAuthority:
             from .mineru_service import validate_pdf_config
             validate_pdf_config(c['pdf'], self.frozen)
 
+    @timed('authority', 'check')
     def check(self):
         self.runtime.gate()
         if file_sha(self.path) != self.digest:

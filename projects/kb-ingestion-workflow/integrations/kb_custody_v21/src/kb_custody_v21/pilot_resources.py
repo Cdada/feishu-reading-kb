@@ -11,6 +11,7 @@ import subprocess
 import sys
 
 from .contracts import ContractError, stable_key
+from .archive_timing import timed
 from .storage_layout import StorageUnavailable
 
 
@@ -69,6 +70,7 @@ class PilotResources:
         self.registry, self.probe = registry, probe if probe is not None else macos_sample
         self.minimum_free_bytes = minimum_free_bytes
 
+    @timed('resources', 'check')
     def check(self):
         try:
             storage = self.registry.runtime.check_storage()

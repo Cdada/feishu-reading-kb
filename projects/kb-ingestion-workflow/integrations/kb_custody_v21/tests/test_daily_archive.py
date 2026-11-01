@@ -92,6 +92,19 @@ class ArchiveTests(unittest.TestCase):
         self.assertFalse(any(x['tag']=='button' for x in render_card(card)['body']['elements']))
         self.assertNotIn('root_id',card['binding'])
 
+    def test_timing_tracks_verified_mention_feedback_without_extra_requests(self):
+        from kb_custody_v21.archive_timing import ArchiveTiming,report
+        self.store.timing=ArchiveTiming(self.store,dict(source_commit='a'*40))
+        self.persist();self.now+=20;self.flow.drain()
+        sample=report(self.store.path)['samples'][0]
+        self.assertEqual(sample['first_feedback_at'],self.now)
+        self.assertEqual(sample['first_feedback_from_command_observation_seconds'],20)
+        self.assertEqual(sample['first_feedback_from_registration_seconds'],0)
+        self.assertEqual([m['kind'] for m in sample['timeline']],['phase','archive_command'])
+        self.assertEqual([x[1] for x in self.calls],['message','message','send','message'])
+        self.now+=100;self.flow.drain()
+        self.assertEqual(report(self.store.path)['samples'][0]['first_feedback_at'],sample['first_feedback_at'])
+
     def test_mention_alone_is_supported_but_free_text_is_not_inferred(self):
         for text in ('@_user_1',' @_user_1\n归档 ','@_user_1 归档'):
             self.assertTrue(archive_command(command(text=text),self.p))

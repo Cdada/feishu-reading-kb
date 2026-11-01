@@ -16,6 +16,7 @@ from .contracts import ContractError, stable_key
 from .daily_scheduler import MaterialProblem
 from .daily_reconcile import reconcile_write
 from .daily_store import Deferred
+from .archive_timing import measure, timed
 from .f05 import CliProcess, DOWNLOAD_TIMEOUT_SECONDS, file_sha
 from .locking import open_lock
 from .pilot_feishu import read_json
@@ -88,6 +89,7 @@ class DailyTransport:
             evidence[str(marker)] = file_sha(marker)
         return dict(value=value, receipt=str(path), evidence=evidence)
 
+    @timed('transport_receipt', 'check')
     def _checked_result(self, value):
         self.authority.check()
         if any(file_sha(Path(path))!=digest for path,digest in value['evidence'].items()):
@@ -205,7 +207,8 @@ class DailyTransport:
             control['notice'] = dict(notification_id=notice_plan['notification_id'], plan_path=str(plan_path))
         try:
             a.check()
-            self.runner(control)
+            with measure('feishu_'+kind, 'network'):
+                self.runner(control)
             result = self._receipt(root,kind,download)
             if not result:
                 raise ContractError('CLI returned without a verified physical response')

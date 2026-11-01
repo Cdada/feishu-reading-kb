@@ -19,6 +19,7 @@ import urllib.request
 import uuid
 
 from .contracts import ContractError
+from .archive_timing import timed
 from .daily_store import Deferred
 from .locking import open_lock
 from .mineru_chunks import ChunkFailure, PdfOptions
@@ -189,6 +190,7 @@ class MineruService:
         finally:
             os.close(fd)
 
+    @timed('mineru_service_ready')
     def _ensure(self):
         self._admission()
         if self.process is not None:

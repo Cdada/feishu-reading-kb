@@ -14,6 +14,7 @@ import subprocess
 from types import SimpleNamespace
 
 from .content import ReadingGuideAdapter
+from .archive_timing import measure, timed
 from .contracts import ContractError
 from .conversion import durable_new, sha
 from .f05 import file_sha
@@ -29,6 +30,7 @@ MAX_BYTES = 2 * 1024**2
 TEXT_ENVIRONMENT = ('HOME', 'PATH', 'TMPDIR', 'LANG', 'LC_ALL', 'USER', 'LOGNAME', 'CODEX_HOME')
 
 
+@timed('saved_guide', 'check')
 def load_validated_guide(root, approval_sha, record, content, mapping, consent, *, checked_source, **kwargs):
     """Read an already validated local result, including after the live window.
 
@@ -271,7 +273,8 @@ class PilotTextSession:
                 binding=dict(approvalPath=str(self.approval_path), approvalSha=self.approval_sha,
                     startsAt=a['starts_at'], expiresAt=a['expires_at'], accountSha=a['account_sha256'],
                     consentExpiresAt=consent['expires_at'], requestSha=key, files=files))
-            envelope = self.wire.exchange(packet, access)
+            with measure('guide', 'model'):
+                envelope = self.wire.exchange(packet, access)
             diagnostic = safe_diagnostic(envelope)
             status = envelope.get('status')
             if status not in {'received', 'blocked_before_turn', 'received_rejected', 'unknown'}:
