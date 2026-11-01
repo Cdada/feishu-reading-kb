@@ -26,10 +26,10 @@ class PilotPipeline:
         self.resources = resources if resources is not None else PilotResources(self.registry,
             minimum_free_bytes=max(5*1024**3, intake.conversion.settings.minimum_free_bytes))
 
-    def convert_once(self, *, entry_id=None, duplicate_selection=None):
+    def convert_once(self, *, entry_id=None, duplicate_selection=None, workload="heavy"):
         # work_guarded_once owns this same serial lock. Never acquire it twice.
         return self.intake.work_guarded_once(resources=self.resources, entry_id=entry_id,
-                                             duplicate_selection=duplicate_selection)
+                                             duplicate_selection=duplicate_selection, workload=workload)
 
     def _event(self, entry_id, phase):
         rows = self.registry.rows('SELECT payload_json FROM custody_events WHERE dedupe_key=?',
@@ -78,7 +78,9 @@ class PilotPipeline:
             checked_attempt()
         try:
             with self.intake._serial():
-                capacity = self.resources.check()
+                # Cloud text is light; images and the later preview renderer
+                # retain strict admission. Manual compositions keep their policy.
+                capacity = self.resources.check(workload='light') if daily_attempt is not None and not images else self.resources.check()
                 if capacity['state'] != 'resources_ready':
                     return capacity
                 job = self.intake._job(entry_id)

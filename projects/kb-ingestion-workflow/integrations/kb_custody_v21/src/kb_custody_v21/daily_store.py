@@ -14,6 +14,7 @@ import re
 import sqlite3
 import time
 
+from .archive_usage import SCHEMA as USAGE_SCHEMA, reserve_owner
 from .contracts import ContractError
 from .daily_policy import DailyPolicy
 from .registry import encoded
@@ -98,7 +99,7 @@ class DailyStore:
                 raise ContractError('refusing to modify an unrelated database')
             if 'daily_meta' in tables and self._get(db, 'schema') != 1:
                 raise ContractError('unsupported daily database schema')
-            db.executescript(SCHEMA)
+            db.executescript(SCHEMA + USAGE_SCHEMA)
         self.path.chmod(0o600)
         with self.transaction() as db:
             version = self._get(db, 'schema')
@@ -383,8 +384,9 @@ class DailyStore:
             attempt = row['attempts'] + 1
             db.execute("UPDATE daily_operations SET state='started',attempts=?,updated=? WHERE op_key=?", (attempt, self.now(), key))
             if physical_requests:
-                db.execute('INSERT INTO daily_requests(op_key,attempt,kind,at,count) VALUES (?,?,?,?,?)',
+                cursor=db.execute('INSERT INTO daily_requests(op_key,attempt,kind,at,count) VALUES (?,?,?,?,?)',
                            (key, attempt, kind, self.now(), physical_requests))
+                reserve_owner(db,cursor.lastrowid,kind)
             return attempt
 
     def complete(self, key, attempt, result):

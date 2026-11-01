@@ -143,7 +143,7 @@ class PilotIntake:
                     custody_health=receipt['custody_health'], processing_state=state,
                     task_id=job['task_id'], publication_state='NOT_EVALUATED', notification_state='NOT_DISPATCHED_BY_PILOT')
 
-    def work_guarded_once(self, *, resources=None, entry_id=None, duplicate_selection=None):
+    def work_guarded_once(self, *, resources=None, entry_id=None, duplicate_selection=None, workload="heavy"):
         """Live composition entry: query actual host resources at admission boundaries.
 
         Existing work_once remains the offline composition primitive. New live
@@ -153,7 +153,8 @@ class PilotIntake:
         from .pilot_resources import PilotResources
         gate = resources if resources is not None else PilotResources(
             self.registry, minimum_free_bytes=max(5 * 1024**3, self.conversion.settings.minimum_free_bytes))
-        return self.work_once(admission=gate.check, entry_id=entry_id, duplicate_selection=duplicate_selection)
+        admission=gate.check if workload=='heavy' else lambda: gate.check(workload=workload)
+        return self.work_once(admission=admission, entry_id=entry_id, duplicate_selection=duplicate_selection)
 
     def work_once(self, *, admission=None, entry_id=None, duplicate_selection=None):
         """Admit and execute at most one known local conversion, with no retries.

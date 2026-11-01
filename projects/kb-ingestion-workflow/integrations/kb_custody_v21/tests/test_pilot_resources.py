@@ -103,3 +103,20 @@ class ResourcePolicyTests(unittest.TestCase):
              self.assertRaises(ResourceUnavailable):
             macos_sample(self.registry.runtime.root)
         run.assert_not_called()
+
+    def test_light_warning_does_not_clear_heavy_hysteresis(self):
+        heavy=self.check(sample(19))
+        self.assertEqual(heavy['state'],'paused_resources')
+        controller=PilotResources(self.registry,probe=lambda _:sample(5,'warning'))
+        self.assertEqual(controller.check(workload='light')['state'],'resources_ready')
+        self.assertEqual(self.check(sample(24))['reason'],'memory_recovery_threshold')
+        self.assertEqual(self.check(sample(25))['state'],'resources_ready')
+
+    def test_light_still_blocks_critical_disk_failure_and_unreadable_probe(self):
+        for value,reason in [(sample(80,'critical'),'memory_pressure_critical'),
+                             (sample(2,'warning',5*GIB-1),'disk_free_low')]:
+            self.assertEqual(PilotResources(self.registry,probe=lambda _:value).check(workload='light')['reason'],reason)
+        def unavailable(_):raise ResourceUnavailable('synthetic')
+        self.assertEqual(PilotResources(self.registry,probe=unavailable).check(workload='light')['reason'],'resource_probe_unavailable')
+        with self.assertRaises(ContractError):
+            PilotResources(self.registry).check(workload='guessed')

@@ -71,7 +71,10 @@ class PilotResources:
         self.minimum_free_bytes = minimum_free_bytes
 
     @timed('resources', 'check')
-    def check(self):
+    def check(self, *, workload="heavy"):
+        if workload not in {"heavy", "light"}:
+            raise ContractError("unknown resource workload")
+        aggregate = "pilot-resources" if workload=="heavy" else "pilot-resources:light"
         try:
             storage = self.registry.runtime.check_storage()
             sample = self.probe(self.registry.runtime.root)
@@ -86,15 +89,15 @@ class PilotResources:
             sample, unavailable = None, 'resource_probe_unavailable'
         with self.registry.transaction() as db:
             previous = db.execute("""SELECT event_id,payload_json FROM custody_events
-                WHERE event_type='pilot_resource_admission' AND aggregate_id='pilot-resources'
-                ORDER BY rowid DESC LIMIT 1""").fetchone()
+                WHERE event_type='pilot_resource_admission' AND aggregate_id=?
+                ORDER BY rowid DESC LIMIT 1""", (aggregate,)).fetchone()
             old = json.loads(previous['payload_json']) if previous else None
             paused = old is not None and old['state'] == 'paused_resources'
             reason = unavailable
             if sample:
-                if sample.pressure != 'normal':
+                if sample.pressure == 'critical' or workload=='heavy' and sample.pressure!='normal':
                     reason = 'memory_pressure_' + sample.pressure
-                elif sample.free_percent < (25 if paused else 20):
+                elif workload=='heavy' and sample.free_percent < (25 if paused else 20):
                     reason = 'memory_recovery_threshold' if paused else 'memory_free_low'
                 elif sample.disk_free_bytes < self.minimum_free_bytes:
                     reason = 'disk_free_low'
@@ -103,7 +106,7 @@ class PilotResources:
                           pressure=sample.pressure if sample else None,
                           disk_free_bytes=sample.disk_free_bytes if sample else None)
             if old is None or (old['state'], old['reason']) != (result['state'], result['reason']):
-                self.registry.event(db, 'pilot_resource_admission', 'pilot-resources',
-                    stable_key('pilot-resources', previous['event_id'] if previous else 'initial',
+                self.registry.event(db, 'pilot_resource_admission', aggregate,
+                    stable_key(aggregate, previous['event_id'] if previous else 'initial',
                                result['state'], result['reason']), result)
             return result

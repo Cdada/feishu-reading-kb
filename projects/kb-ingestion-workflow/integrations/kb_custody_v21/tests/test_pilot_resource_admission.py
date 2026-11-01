@@ -71,3 +71,10 @@ class ResourceAdmissionTests(unittest.TestCase):
         with patch('kb_custody_v21.pilot_resources.macos_sample',return_value=sample(70,'warning')) as probe:
             self.assertEqual(self.flow.work_guarded_once()['state'],'paused_resources')
         probe.assert_called_once_with(self.registry.runtime.root)
+
+    def test_small_text_light_admission_keeps_all_existing_checkpoints(self):
+        with patch.object(self.flow.conversion.worker,'run_once') as worker:
+            result=self.flow.work_guarded_once(entry_id=self.eid,workload='light',
+                resources=self.resources(sample(10,'warning'),sample(10,'warning'),sample(10,'warning')))
+        worker.assert_called_once()
+        self.assertIsNotNone(result['task_id'])
