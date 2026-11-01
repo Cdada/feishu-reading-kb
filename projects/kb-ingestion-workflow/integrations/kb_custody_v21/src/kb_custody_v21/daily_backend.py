@@ -10,6 +10,7 @@ import threading
 import uuid
 
 from .contracts import ContractError, stable_key
+from .archive_timing import ArchiveTiming, document_step, timed
 from .daily_collector import DailyCollector
 from .daily_original import restore_original
 from .daily_guide import generate_daily_guide, DailyTextWire
@@ -34,6 +35,11 @@ from .registry import Registry, encoded
 class DailyBackend:
     def __init__(self, authority, store, *, transport=None, registry=None, resources=None, wire=None, pdf_converter=None):
         self.authority, self.store, self.wire = authority, store, wire
+        if 'archive_timing' in authority.config:
+            store.timing=ArchiveTiming(store,dict(source_commit=authority.source_commit,
+                source_manifest_sha256=authority.config['source_manifest_sha256'],
+                rules_sha256=authority.digest,guide_script_sha256=authority.frozen[authority.config['text_script']],
+                reading_rules_sha256=authority.reading.rules_sha256 if authority.reading is not None else None))
         self.transport = transport if transport is not None else DailyTransport(authority,store)
         self.collector = DailyCollector(authority,store,self.transport)
         self.transport.before_write=lambda **kw:self.collector.verify_isolation(force=True,**kw)
@@ -141,6 +147,8 @@ class DailyBackend:
 
     def recover(self):
         self.check_authorization()
+        if self.store.timing is not None:
+            self.store.timing.recover()
         # Stage methods re-read authoritative material records. Saved scheduler
         # phases are hints for selection, never proof of generation/publication.
         self.store.put('stop_requested',False)
@@ -258,6 +266,7 @@ class DailyBackend:
             self.qa.collect()
         return result
 
+    @timed('original_integrity', 'check')
     def _check_material(self, document):
         self.check_authorization()
         row=self.registry.entry(document['entry_id'])
@@ -300,8 +309,11 @@ class DailyBackend:
         content=validated_message_content(item,app_id=p.app_id,bot_id=p.bot_id,chat_id=p.chat_id,kind='text',name='',text=text)
         if content.get('text')!=text:
             raise ContractError('sent notice text differs from the persisted plan')
+        if self.store.timing is not None and key.startswith('registered:'):
+            self.store.timing.feedback(key[len('registered:'):])
         return dict(message_id=item['message_id'],receipt=receipt,plan=plan)
 
+    @document_step
     def advance_heavy(self, document):
         if self.stop.is_set():
             raise Deferred('stopping')
@@ -329,6 +341,7 @@ class DailyBackend:
             return self._preview(document)
         raise ContractError('unexpected heavy material phase')
 
+    @timed('save_original')
     def _receive(self, document):
         mid=document['message_id']
         name=document['filename']
@@ -369,6 +382,8 @@ class DailyBackend:
         if row['status']!='accepted' or row['custody_health']!='healthy':
             raise ContractError('original custody did not complete')
         self.store.advance(mid,'registered','original_saved',entry_id=entry_id)
+        if self.store.timing is not None:
+            self.store.timing.characteristics(mid,size=row['size_bytes'])
         canonical=self.store.bind_source(mid,row['sha256'])
         if canonical:
             self.store.advance(mid,'original_saved','duplicate',data=dict(existing_message_id=canonical))
@@ -376,6 +391,7 @@ class DailyBackend:
             return
         self.notice('custody:'+mid,'“'+name+'”的原件已完整保存，将按队列制作导读。',purpose='custody')
 
+    @timed('conversion')
     def _convert(self, document):
         mid=document['message_id']
         # Reconcile a crash between saving the original and its content key.
@@ -415,7 +431,12 @@ class DailyBackend:
                 raise MaterialProblem('PDF 转换尚未获得日常规则授权。')
             try:
                 with self.intake.staging.input_binding(document['entry_id'], 'daily_mineru_conversion') as binding:
-                    kwargs = dict(progress=lambda event:self.pdf_progress.record(mid,event)) if self.pdf_progress else {}
+                    def progress(event):
+                        if self.pdf_progress is not None:
+                            self.pdf_progress.record(mid,event)
+                        if self.store.timing is not None:
+                            self.store.timing.characteristics(mid,pages=event['total_pages'])
+                    kwargs = dict(progress=progress) if self.pdf_progress or self.store.timing is not None else {}
                     complete = self.pdf_chunks.convert(Path(binding['path']), row['sha256'], **kwargs)
             except PdfHeld as error:
                 raise MaterialProblem(str(error)) from error
@@ -435,6 +456,7 @@ class DailyBackend:
         extraction=json.loads(task['quality_json'])['extraction']['extraction_id']
         self.store.advance(mid,'original_saved','converted',data=dict(extraction_id=extraction))
 
+    @timed('guide_preparation')
     def _guide(self, document):
         mid=document['message_id']
         source=document['source_sha']
@@ -585,6 +607,7 @@ class DailyBackend:
                        ('pilot-'+stable_key(job['request_key'],task_id),document['entry_id']))
         self.store.put('conversion-restart:'+document['message_id'],None)
 
+    @timed('preview_delivery')
     def _preview(self, document):
         previews=self.pipeline.previews
         pid=document['publication_id']
@@ -650,6 +673,7 @@ class DailyBackend:
             raise Deferred('reply_changed_wait_for_fresh_observation')
         return parsed,detail,listed
 
+    @document_step
     def advance_light(self, document):
         self.check_authorization()
         self._storage_ready()
@@ -719,6 +743,7 @@ class DailyBackend:
                 self.relations.start(document)
             self.store.advance(document['message_id'],'published','notified',data=dict(completion_notice=receipt))
 
+    @timed('material_publication')
     def _decide(self, document):
         evidence=document['data']['decision']
         def access():

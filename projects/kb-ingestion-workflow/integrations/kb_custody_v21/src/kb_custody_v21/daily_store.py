@@ -86,6 +86,7 @@ class DailyStore:
     def __init__(self, path, policy: DailyPolicy, *, clock=time.time):
         self.path = no_symlinks(Path(path).absolute())
         self.policy, self.clock = policy, clock
+        self.timing = None
         if (not self.path.exists() or self.path.stat().st_size==0) and any(
                 (self.path.parent/name).exists() for name in ('requests','model-grants')):
             raise ContractError('daily ledger is missing beside retained requests; refuse to reset usage')
@@ -175,6 +176,10 @@ class DailyStore:
     def put(self, key, value):
         with self.transaction() as db:
             self._put(db, key, value)
+            if self.timing is not None and key.startswith('defer:'):
+                self.timing.defer(db,key[len('defer:'):],value)
+            if self.timing is not None and key=='heartbeat':
+                self.timing.service(db,value)
 
     def scan(self, channel, *, initial_start):
         """Return a stable interval and cursor; restarts reuse its original end."""
@@ -277,6 +282,8 @@ class DailyStore:
         db.execute('''INSERT INTO daily_documents(message_id,filename,phase,created,updated,data)
                       VALUES (?,?,'registered',?,?,?)''',
                    (mid, filename, self.now(), self.now(), encoded(dict(resource=resource))))
+        if self.timing is not None:
+            self.timing.register(db,mid,item,filename)
 
     def document(self, message_id):
         rows = self.rows('SELECT * FROM daily_documents WHERE message_id=?', (message_id,))
@@ -305,6 +312,8 @@ class DailyStore:
             db.execute('UPDATE daily_documents SET ' + ','.join(k+'=?' for k in changes) + ' WHERE message_id=?',
                        (*changes.values(), message_id))
             self._event(db, 'phase', dict(message_id=message_id, before=expected, after=target))
+            if self.timing is not None:
+                self.timing.transition(db,message_id,expected,target)
 
     def bind_source(self, message_id, digest):
         if not isinstance(digest, str) or not re.fullmatch('[a-f0-9]{64}', digest):

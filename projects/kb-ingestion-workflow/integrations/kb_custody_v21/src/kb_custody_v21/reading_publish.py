@@ -12,6 +12,7 @@ from pathlib import Path
 import stat
 
 from .contracts import ContractError
+from .archive_timing import timed
 from .daily_transport import durable_file
 from .locking import open_lock
 from .reading_bundle import CARDS, TOPICS, BRIEFS, check_links
@@ -113,6 +114,7 @@ def prepare_plan(profile, bundle, job_root, *, checked_access):
     return sha(plan)
 
 
+@timed('reading_publication')
 def publish_plan(profile, job_root, plan_sha, *, checked_access, after_write=None):
     checked_access(); profile.check()
     no_symlinks(job_root)

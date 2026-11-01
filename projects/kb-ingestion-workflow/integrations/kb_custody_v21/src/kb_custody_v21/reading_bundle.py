@@ -13,6 +13,7 @@ from markdown_it import MarkdownIt
 import yaml
 
 from .contracts import ContractError
+from .archive_timing import timed
 from . import table_evidence
 from .layout_evidence import checked_policy
 from .reading_contract import CATEGORIES, require, sha, validate_review
@@ -120,6 +121,7 @@ def check_links(path, raw, available):
         require(len(candidates)==1 and all(v in available for v in candidates), 'missing or ambiguous Wikilink')
 
 
+@timed('reading_bundle')
 def build_bundle(source, draft, review, *, assets, date, existing_files):
     validate_review(review, draft, source)
     require(review['status']=='approve', 'independent review must approve before rendering')
@@ -242,7 +244,7 @@ def build_bundle(source, draft, review, *, assets, date, existing_files):
             meta = dict(title=card['title'], type=card['kind'], workflow_role='interpretive' if card['kind']=='fiction_interpretation_card' else 'formal',
                 status='active', created=date, updated=date, related=[note], sources=[source_id], reading_materials=[source_key],
                 validation_status=review['validation_status'], review_method='codex',
-                sensitivity='private' if private else 'unspecified')
+                sensitivity='private' if private else 'unspecified', brief_visibility='exclude' if private else 'include')
             if card['kind']=='fiction_interpretation_card':
                 meta.update(epistemic_scope='authorial_speculation', knowledge_status='hypothesis_not_verified')
             body = '# '+label(card['title'])
@@ -257,6 +259,8 @@ def build_bundle(source, draft, review, *, assets, date, existing_files):
             meta['updated'] = date
             if private:
                 meta['sensitivity']='private'
+            if meta.get('sensitivity')=='private':
+                meta['brief_visibility']='exclude'
         body += '\n\n## 新增来源补充\n\n'+link(path,note,draft['title'])+'\n\n'+card['reuse_reason']
         body += content([dict(heading='内容与依据',claim_ids=card['claim_ids'])],path)
         put(path,meta,body)
@@ -268,10 +272,26 @@ def build_bundle(source, draft, review, *, assets, date, existing_files):
             meta, body = frontmatter(old['text'])
         else:
             require(path not in existing_files, 'topic title collides with existing output')
-            meta=dict(title=topic['title'], type='topic_index', workflow_role='navigation', status='draft', created=date, updated=date)
+            meta=dict(title=topic['title'], type='topic_index', workflow_role='navigation', status='draft', created=date, updated=date,
+                content_nature=draft['content_nature'], sensitivity='private' if private else 'unspecified',
+                brief_visibility='exclude' if private else 'include')
             body='# '+label(topic['title'])+'\n\n本页仅提供来源导航；不据此声称已形成专题综述。'
-        heading = '虚构作品中的思辨材料' if draft['content_nature']=='fiction' else '来源导航（保留各自证据边界）'
-        body += '\n\n## '+heading+'\n\n- '+link(path,note,draft['title'])
+        # Shared navigation inherits the more restrictive source boundary;
+        # a subsequent public source must never clear an existing private mark.
+        if private:
+            meta['sensitivity']='private'
+        if meta.get('sensitivity')=='private':
+            meta['brief_visibility']='exclude'
+        if old and meta.get('content_nature') != draft['content_nature']:
+            meta['content_nature']='mixed'
+        heading = {'fiction':'虚构作品中的思辨材料', 'mixed':'混合材料（事实、解释与设定分别核对）'}.get(
+            draft['content_nature'], '来源导航（保留各自证据边界）')
+        body += '\n\n## '+heading
+        if private:
+            body += '\n\n本来源为私密材料，本主题不纳入简报。'
+        if draft['content_nature']=='fiction' or any(c['basis'] in ('fictional_setting','scenario') for c in draft['claims']):
+            body += '\n\n其中的虚构设定与情景推演不构成经核实的事实或能力证明。'
+        body += '\n\n- '+link(path,note,draft['title'])
         meta['updated']=date
         put(path,meta,body)
     # One material entry per day. Private source titles and contents never enter

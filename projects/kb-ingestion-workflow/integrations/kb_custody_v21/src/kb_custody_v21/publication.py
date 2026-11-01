@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 
 from .contracts import ContractError, new_id, validate_id
+from .archive_timing import timed
 from .conversion import sha, CustodyConversion
 from .content import validate_record, validate_evidence
 from .metadata import asset, render_metadata
@@ -38,6 +39,7 @@ class Publications:
             os.close(fd)
         return path
 
+    @timed('preview_render_and_prepare')
     def prepare(self, entry_id, record, mapping, body, curation, guide, policy, *, font_path, revision_of=None, images=(),
                 on_prepared=None):
         self.runtime.gate()
@@ -143,6 +145,7 @@ class Publications:
         with self.registry.transaction() as db:
             self._confirm_in_transaction(db,pid,pdf_sha256,actor,confirmation_ref)
 
+    @timed('material_candidate', 'check')
     def candidate_review(self, row, path, *, db=None):
         mapping = json.loads((path / '提取/extraction-map.json').read_bytes())
         review_path = path / '发布记录/材料复核.json'

@@ -194,6 +194,16 @@ class ArchiveMentions:
                     card = self.b.card_flow.cards.get(fresh['card_id'])
                     if card['state'] == 'prepared':
                         self.delivery.send(card, json.loads(fresh['proof']))
+                    if self.store.timing is not None:
+                        # The verified command-to-attachment binding is already
+                        # retained. A second @ never resets first feedback time.
+                        targets=self.store.rows("SELECT m.key,m.value FROM daily_meta m JOIN archive_timing_samples s "
+                            "ON m.key='archive-request:'||s.message_id WHERE s.first_feedback_at IS NULL")
+                        for target in targets:
+                            if json.loads(target['value']).get('command_id')==row['message_id']:
+                                self.store.timing.feedback(target['key'][len('archive-request:'):])
+                                self.store.timing.mark(target['key'][len('archive-request:'):],
+                                    'archive_command',dict(observed_at=row['created']))
                     with self.store.transaction() as db:
                         db.execute("UPDATE daily_archive_inbox SET state='processed' WHERE message_id=?", (row['message_id'],))
             except Deferred as error:

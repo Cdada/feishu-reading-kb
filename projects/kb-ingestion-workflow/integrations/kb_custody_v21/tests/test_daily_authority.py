@@ -54,6 +54,13 @@ class AuthorityTests(unittest.TestCase):
         self.value['approved']=False
         with self.assertRaisesRegex(ContractError,'not been approved'):DailyAuthority(self.path,self.save())
 
+    def test_archive_timing_accepts_only_the_four_sample_profile(self):
+        self.value['archive_timing']=dict(reference='archive-timing-v1',sample_limit=4)
+        self.assertIsNotNone(DailyAuthority(self.path,self.save()))
+        for limit in (True,4.0,3,5):
+            self.value['archive_timing']['sample_limit']=limit
+            with self.subTest(limit=limit),self.assertRaises(ContractError):DailyAuthority(self.path,self.save())
+
     def test_explicit_hash_is_required_and_cannot_follow_a_mutation(self):
         digest=self.save()
         self.value['policy']['model_turn_limit']=100

@@ -6,6 +6,7 @@ import subprocess
 import signal
 
 from .contracts import ContractError
+from .archive_timing import timed
 from .daily_store import Deferred
 from .pilot_text import MAX_BYTES, TEXT_ENVIRONMENT
 from .registry import encoded
@@ -26,6 +27,7 @@ def probe(command, packet):
         return json.loads(output)
 
 
+@timed('subscription', 'check')
 def require_subscription(authority, store):
     if not store.policy.standing_daily:
         return

@@ -122,6 +122,42 @@ class ReadingContentTests(unittest.TestCase):
         self.draft['content_nature']='mixed';self.draft['claims'][0]['basis']='scenario'
         with self.assertRaises(ContractError):validate_draft(self.draft,self.source)
 
+    def test_private_mixed_topic_retains_scope_and_never_enters_brief(self):
+        self.source['provenance']['sensitivity']='private'
+        self.draft['content_nature']='mixed'
+        self.draft['claims'][0]['basis']='scenario'
+        self.draft['cards'][0]['kind']='fiction_interpretation_card'
+        bundle=self.bundle()
+        self.assertFalse(any(p.startswith(BRIEFS+'/') for p in bundle['files']))
+        for prefix in (CARDS,TOPICS):
+            value=next(v for p,v in bundle['files'].items() if p.startswith(prefix+'/'))
+            meta,body=frontmatter(value.decode())
+            self.assertEqual((meta['sensitivity'],meta['brief_visibility']),('private','exclude'))
+            if prefix==TOPICS:
+                self.assertEqual(meta['content_nature'],'mixed')
+                self.assertIn('虚构设定与情景推演',body)
+
+    def test_shared_topic_becomes_private_and_cannot_be_downgraded(self):
+        first=self.bundle()
+        path=next(p for p in first['files'] if p.startswith(TOPICS+'/'))
+        original=first['files'][path].decode()
+        self.source['existing_topics']={path:dict(text=original,sha256=hashlib.sha256(original.encode()).hexdigest())}
+        self.draft['topics'][0]['existing_path']=path
+        self.draft['cards']=[]
+        self.source['provenance']['sensitivity']='private'
+        second=build_bundle(self.source,self.draft,reviewed(self.source,self.draft),assets=assets(self.source),
+            date='2026-10-12',existing_files=first['files'])
+        value=second['files'][path].decode();meta,_=frontmatter(value)
+        self.assertEqual((meta['sensitivity'],meta['brief_visibility']),('private','exclude'))
+        self.source['existing_topics'][path]=dict(text=value,sha256=hashlib.sha256(value.encode()).hexdigest())
+        self.source['provenance'].pop('sensitivity')
+        # No new card or daily brief entry is needed to verify topic reuse.
+        self.draft['cards']=[]
+        third=build_bundle(self.source,self.draft,reviewed(self.source,self.draft),assets=assets(self.source),
+            date='2026-10-13',existing_files=dict(first['files'],**second['files']))
+        meta,_=frontmatter(third['files'][path].decode())
+        self.assertEqual((meta['sensitivity'],meta['brief_visibility']),('private','exclude'))
+
     def test_no_excerpts_no_invented_personal_attention(self):
         self.draft['keywords']['attention']=deepcopy(self.draft['keywords']['objective'])
         with self.assertRaises(ContractError):validate_draft(self.draft,self.source)

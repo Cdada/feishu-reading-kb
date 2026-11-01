@@ -106,6 +106,24 @@ class ReadingFlowTests(unittest.TestCase):
         self.assertTrue(list(self.a.root.glob('reading-jobs/*/model/*/approval-draft.local.json')))
         self.assertFalse(self.a.reading.root.exists())
 
+    def test_timing_separates_guide_organization_review_and_publication(self):
+        from kb_custody_v21.archive_timing import ArchiveTiming,report
+        self.daily.timing=ArchiveTiming(self.daily,dict(source_commit='a'*40))
+        # Reconstruct this fixture's synthetic registration before exercising
+        # the real guide/reading composition. Selection itself has queue tests.
+        with self.daily.transaction() as db:
+            self.daily.timing.register(db,self.f.mid,self.f.g.f.message,self.document()['filename'])
+            self.daily.timing.transition(db,self.f.mid,'registered','original_saved')
+        self.approve();self.finish()
+        sample=report(self.daily.path)['samples'][0]
+        self.assertEqual(sample['phase'],'notified')
+        self.assertEqual(self.daily.summary()['model_turns'],3)
+        metrics=sample['check_and_step_totals']
+        for purpose in ('guide','reading_organize','reading_review'):
+            self.assertEqual(metrics['model:'+purpose]['count'],1)
+        self.assertEqual(metrics['step:reading_publication']['count'],1)
+        self.assertTrue(any(s['stage'].startswith('reading:') for s in sample['segments']))
+
     def test_unknown_turn_is_never_replayed_after_restart(self):
         self.approve();self.step();self.wire.fail=True
         with self.assertRaises(Deferred):self.step()

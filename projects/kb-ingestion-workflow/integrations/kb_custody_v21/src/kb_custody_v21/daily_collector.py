@@ -6,6 +6,7 @@ import uuid
 from urllib.parse import urlencode
 
 from .contracts import ContractError, stable_key
+from .archive_timing import timed
 from .f01 import PREFIX
 from .daily_store import Deferred
 from .f02 import ISOLATION, administration
@@ -17,6 +18,7 @@ class DailyCollector:
         self.authority, self.store, self.transport = authority, store, transport
         self.isolation_lock=threading.Lock()
 
+    @timed('group_identity', 'check')
     def verify_isolation(self, *, force=False, confirmation=False):
         with self.isolation_lock:
             return self._verify_isolation(force=force,confirmation=confirmation)
@@ -220,6 +222,7 @@ class DailyCollector:
         self.transport._checked_result(receipt)
         return json.loads(row['payload']),receipt
 
+    @timed('message_identity', 'check')
     def message(self, message_id):
         observed, listed = self.observed(message_id)
         version = hashlib.sha256(encoded(observed).encode()).hexdigest()

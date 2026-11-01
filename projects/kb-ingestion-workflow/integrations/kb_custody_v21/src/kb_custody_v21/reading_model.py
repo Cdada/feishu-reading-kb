@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 
 from .contracts import ContractError
+from .archive_timing import measure, timed
 from .daily_store import Deferred
 from .daily_subscription import require_subscription
 from .daily_transport import durable_file
@@ -116,7 +117,8 @@ class ReadingModel:
             packet=dict(model=MODEL,effort='medium',waitMs=approval['wait_seconds']*1000,
                 request=raw,requestId='reading-'+request_sha[:40],binding=binding)
             try:
-                envelope=self.wire.exchange(packet,before_access)
+                with measure('reading_'+purpose, 'model'):
+                    envelope=self.wire.exchange(packet,before_access)
             except (OSError,ContractError) as error:
                 self.store.save_call_result(material_id,purpose,'unknown',dict(reason=type(error).__name__),checked_access=check_source)
                 raise Deferred('reading_model_result_unknown_no_resubmit') from error
@@ -140,5 +142,6 @@ class ReadingModel:
         return output
 
     @staticmethod
+    @timed('reading_output', 'check')
     def _validate(purpose,output,source,draft):
         return validate_draft(output,source) if purpose=='organize' else validate_review(output,draft,source)
