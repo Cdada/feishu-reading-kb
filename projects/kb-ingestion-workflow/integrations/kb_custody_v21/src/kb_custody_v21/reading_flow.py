@@ -72,6 +72,9 @@ class ReadingFlow:
         expected=json.loads(row['files_json'])
         if sum(v['size_bytes'] for v in expected.values())+entry['size_bytes']>MAX_LIBRARY_BYTES//2:
             raise MaterialProblem('本份资料超出受控写入体积，需要 Codex 分批整理；已保存的原件保留，其他材料可继续处理。')
+        if sum(v['size_bytes'] for v in expected.values())+entry['size_bytes']>16*1024**2:
+            if self.backend.pipeline.resources.check()['state']!='resources_ready':
+                raise Deferred('paused_resources')
         root_fd=open_root(path,root_identity(path))
         try:
             files={name:read_at(root_fd,name) for name in expected}

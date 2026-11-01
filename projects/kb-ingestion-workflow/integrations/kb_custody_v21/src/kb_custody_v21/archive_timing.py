@@ -15,6 +15,7 @@ import sqlite3
 import time
 import uuid
 
+from .archive_usage import attributed
 from .contracts import ContractError
 from .registry import encoded
 from .runtime import no_symlinks
@@ -81,6 +82,7 @@ def timed(name, kind='step'):
 
 def document_step(function):
     @wraps(function)
+    @attributed('message_id')
     def run(backend, document, *args, **kwargs):
         main=getattr(backend,'main_cards',None)
         active=main is not None and main.handles(document['message_id'])

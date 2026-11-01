@@ -16,6 +16,7 @@ from .f01 import PREFIX
 from .f05 import file_sha
 from .registry import encoded
 from .archive_handoff import ArchiveHandoff
+from .archive_usage import attributed
 
 
 LABELS = {
@@ -191,6 +192,7 @@ class MainCards:
         state.pop('pending')
         self.store.put('archive-main:'+mid, state)
 
+    @attributed('id')
     def report_one(self, mid, *, force=False):
         state = self.state(mid) or {}
         if state.get('disabled'):
@@ -306,6 +308,7 @@ class MainCards:
         mid = self.store.get('archive-main-action:'+card['card_id'])
         return self.state(mid) if mid else None
 
+    @attributed('document_id')
     def read_event(self, card, event, proof):
         state = self.action_state(card)
         # An interrupted PATCH must be reconciled before admitting a click.

@@ -175,6 +175,8 @@ class DailyBackend:
 
 
     def report_status(self):
+        from .archive_usage import settle
+        settle(self.store)
         if self.main_cards is not None:
             self.main_cards.record_handoffs()
         try:
@@ -334,6 +336,13 @@ class DailyBackend:
             self.store.timing.feedback(key[len('registered:'):])
         return dict(message_id=item['message_id'],receipt=receipt,plan=plan)
 
+    def resource_workload(self, document):
+        if document['phase']=='original_saved':
+            entry=self.registry.entry(document['entry_id'])
+            if Path(document['filename']).suffix.lower() not in {'.md','.txt'} or entry['size_bytes']>1024**2:
+                return 'heavy'
+        return 'light'
+
     @document_step
     def advance_heavy(self, document):
         if self.stop.is_set():
@@ -342,7 +351,7 @@ class DailyBackend:
         self._storage_ready()
         self.collector.verify_isolation()
         phase=document['phase']
-        if self.pipeline.resources.check()['state']!='resources_ready':
+        if self.pipeline.resources.check(workload=self.resource_workload(document))['state']!='resources_ready':
             raise Deferred('paused_resources')
         if phase=='reading':
             if self.reading_flow is None:
@@ -473,7 +482,7 @@ class DailyBackend:
             except PdfHeld as error:
                 raise MaterialProblem(str(error)) from error
             self.intake.conversion.pdf_result = lambda accepted: complete if accepted['sha256'] == row['sha256'] else None
-        result=self.pipeline.convert_once(entry_id=document['entry_id'])
+        result=self.pipeline.convert_once(entry_id=document['entry_id'],workload=self.resource_workload(document))
         if result.get('state') in ('busy','paused_resources','paused_capacity'):
             raise Deferred(result['state'])
         state=self.intake.status(document['entry_id'])

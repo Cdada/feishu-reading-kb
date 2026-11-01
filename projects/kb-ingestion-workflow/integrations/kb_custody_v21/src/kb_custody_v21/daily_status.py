@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 import sqlite3
+import time
+from .archive_usage import snapshot
 
 from .daily_launcher import DailyLauncher
 from .runtime import no_symlinks
@@ -39,6 +41,7 @@ def local_status(root):
                 blocked=[dict(document_id=v['document_id'],reason=v.get('error')) for v in tasks if v['state']=='blocked'],
                 write_pending=bool(meta.get('relation-write-pending')),
                 wait=meta.get('relation-wait'))
+        summary['http_usage']=snapshot(db,time.time(),meta['policy'])
         handoff_path=no_symlinks(root/'待处理材料与接续说明.local.md')
         handoff=dict(path=str(handoff_path) if handoff_path.exists() else None,error=meta.get('archive-handoff-error'))
         return dict(result,summary=summary,archive_handoff=handoff,heartbeat=meta.get('heartbeat'),network_pause=meta.get('network_pause'),
@@ -64,6 +67,9 @@ def user_summary(value, *, max_items=None):
     if value.get('archive_handoff',{}).get('error'):
         lines.append('本机接续说明更新失败，请由 Codex 检查；归档记录保留。')
     summary=value.get('summary',{})
+    usage=summary.get('http_usage',{})
+    if usage.get('near_limit'):
+        lines.append('飞书请求接近本地日限额：'+str(usage['reserved_24h'])+'/'+str(usage['limit_24h'])+'（滚动24小时预留，含失败请求）。')
     if summary.get('last_published'):
         lines.append('最近入库：'+title(summary['last_published']))
     lines.append('可自动继续：'+str(summary.get('continuing_count',0))+' 份')
