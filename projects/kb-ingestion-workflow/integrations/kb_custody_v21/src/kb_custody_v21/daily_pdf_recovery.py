@@ -69,7 +69,7 @@ def _resume(authority, store, registry, message_id, *, operator_ref, first_page,
         return dict(state='repair_saved_other_chunks_pending',new_model_calls=0,new_conversion_calls=0)
     if all(c['completed'] is not None for c in manifest['chunks']):
         complete = engine.convert(source,entry['sha256'])
-        text = (complete/'source.md').read_text(encoding='utf-8')
+        text = (complete/'source.md').read_bytes().decode('utf-8')
         checked_mineru_map(read_json(complete/'source.pages.json'),text,entry['sha256'],complete)
     else:
         # Later, unattempted chunks resume under the normal service; the repair
