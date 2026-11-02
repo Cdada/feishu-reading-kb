@@ -78,7 +78,7 @@ def stage_pdf_result(conversion, entry, batch, result):
     result = conversion.runtime.checked(Path(result))
     proof = json.loads((result.parent / 'complete.json').read_bytes())
     checked_snapshot(result, proof['files'])
-    content = (result / 'source.md').read_text(encoding='utf-8')
+    content = (result / 'source.md').read_bytes().decode('utf-8')
     mapping = json.loads((result / 'source.pages.json').read_bytes())
     checked_mineru_map(mapping, content, entry['sha256'], result)
     manifest = batch / '_batch_manifest.csv'

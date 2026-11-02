@@ -71,6 +71,45 @@ class DailyPdfTests(unittest.TestCase):
         self.assertEqual(self.store.summary()['model_turns'],1)
         self.assertEqual(self.g.wire.calls,1)
 
+    def test_pdf_import_preserves_cr_and_crlf_in_page_evidence(self):
+        original = self.converter.convert
+        def convert(pdf, output, *, mode):
+            original(pdf, output, mode=mode)
+            path = output/'paper_content_list.json'
+            items = json.loads(path.read_bytes())
+            items[1]['text'] += ' Retained\rcarriage return and\r\npaired newline.'
+            path.write_text(json.dumps(items))
+        self.converter.convert = convert
+        self.advance()
+        document = self.store.document(self.mid)
+        self.assertEqual(document['phase'], 'converted')
+        snapshot, mapping, root = self.backend.intake.conversion.extraction(document['data']['extraction_id'])
+        source = (root/'source.md').read_bytes().decode('utf-8')
+        self.assertIn('Retained\rcarriage return and\r\npaired newline.', source)
+        self.assertEqual(mapping['text_length'], len(source))
+        self.assertEqual(self.store.summary()['model_turns'], 0)
+        self.assertEqual(len(self.converter.calls), 2)
+
+    def test_operator_repair_preserves_cr_and_crlf_without_reparse(self):
+        self.converter.fail = lambda pdf,mode:pdf.stem.startswith('p0006')
+        scheduler = DailyScheduler(self.store,self.backend)
+        scheduler._isolated(self.store.document(self.mid),self.backend.advance_heavy)
+        scheduler.close()
+        raw = self.root/'repair-newlines'
+        SyntheticMineru().convert(self.root/'p0006-0007.pdf',raw,mode='ocr')
+        path = raw/'paper_content_list.json'
+        items = json.loads(path.read_bytes())
+        items[1]['text'] += ' Retained\rcarriage return and\r\npaired newline.'
+        path.write_text(json.dumps(items))
+        result = resume_repaired_pdf(self.authority,self.store,self.registry,self.mid,
+            operator_ref='synthetic-newlines',first_page=6,raw_output=raw)
+        self.assertEqual(result['state'], 'ready_to_resume')
+        self.backend.stop.clear()
+        self.advance()
+        self.assertEqual(self.store.document(self.mid)['phase'], 'converted')
+        self.assertEqual(len(self.converter.calls), 3)
+        self.assertEqual(self.store.summary()['model_turns'], 0)
+
     def test_failed_chunk_holds_only_this_document_without_a_model_reservation(self):
         self.converter.fail = lambda pdf, mode:pdf.stem.startswith('p0006')
         scheduler = DailyScheduler(self.store,self.backend)
