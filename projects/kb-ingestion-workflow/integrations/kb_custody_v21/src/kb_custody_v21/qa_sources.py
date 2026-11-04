@@ -9,6 +9,7 @@ from . import table_evidence
 from .f05 import file_sha
 from .layout_evidence import checked_policy
 from .reading_contract import sha
+from .reading_input_storage import unpack as unpack_reading_input
 from .reading_publish import read_at
 from .relation_catalog import Catalog, read_json_at
 from .runtime import no_symlinks
@@ -36,7 +37,7 @@ class QASources:
             raise ContractError('问答输入必须来自本资料已复核的整理记录。')
         if file_sha(source_path) != detail['input_file_sha256']:
             raise ContractError('已复核的整理输入发生变化。')
-        source = json.loads(source_path.read_bytes())['source']
+        source = unpack_reading_input(json.loads(source_path.read_bytes()))['source']
         receipt_path = no_symlinks(expected_parent/'publication/published.local.json')
         if receipt_path.stat().st_size > 4*1024*1024:
             raise ContractError('入库文件清单超出问答范围。')

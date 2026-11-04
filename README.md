@@ -35,6 +35,8 @@ flowchart TD
 
 - [系统功能清单](docs/system-functions.md)：模型变更检查、知识库离线回归检查，均按需调用；调用方法和边界集中在此查看。
 
+[文档格式整合发布](docs/format-integration.md) 说明这些格式如何与当前处理卡片、整理记录和问答相接，以及部署、回退和验证边界。
+
 ## 开始使用
 
 先看 [离线开发与测试](docs/development.md)，再看 [配置与归档规则](docs/configuration.md)。实现入口见 [结构与边界](docs/architecture.md)。
